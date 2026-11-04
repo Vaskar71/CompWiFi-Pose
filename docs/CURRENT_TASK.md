@@ -2,16 +2,17 @@
 
 ## Current phase
 
-Phase 0 environment setup remains open. The requested legacy single-person
-baseline repairs and focused tests are implemented, but model and feeder runtime
-verification is blocked by missing dependencies. The real-data audit and
-real-sample test remain blocked because no Person-in-WiFi-3D split content is
+Phase 0 environment setup and Step 3 baseline smoke verification remain open.
+The current repairs are provisional: dependency-independent checks now pass for
+checkpoint-path consistency and effective-batch gradient accumulation, but model
+and feeder runtime tests remain blocked by missing packages. The real-data audit
+and real-sample test remain blocked because no Person-in-WiFi-3D split content is
 available locally; no pretrained checkpoint is present either.
 
-No baseline training, dataset preprocessing, evaluation, or experiment was
-started. Syntax checks, the checkpoint-path configuration test, and diff checks
-have completed; the synthetic model optimization/checkpoint smoke tests have not
-run successfully in the current environment.
+No package installation, environment creation, baseline training, dataset
+preprocessing, evaluation, or experiment was started. Step 3 must not close until
+the complete focused suite runs in the approved dedicated environment and every
+dependency-independent test genuinely passes.
 
 ## Completed work
 
@@ -53,13 +54,18 @@ run successfully in the current environment.
   import, so the expected `NameError` was not observed.
 - Aligned the PiW3D pose YAML with the existing pretraining checkpoint directory.
 - Enabled the processor's existing combined amplitude/phase `csi_ap` output.
-- Added the missing pose `step_count` increment without changing loss scaling or
-  the `steps_per_update=1` update frequency.
+- Added the missing pose `step_count` increment and divided accumulated losses by
+  `steps_per_update` for `steps_per_update > 1`. The helper returns the original
+  loss object unchanged when `steps_per_update == 1`; the synthetic
+  effective-batch accumulation test passes.
 - Guarded constant amplitude/phase normalization and added an optional PiW3D
   loader `num_workers` argument whose default remains `8`.
 - Added focused tests for MAE backward, pose output, one optimization step,
-  checkpoint round-trip, constant CSI normalization, checkpoint-path consistency,
-  and a conditional real training-sample load using `num_workers=0`.
+  effective-batch accumulation, checkpoint round-trip, constant CSI
+  normalization, checkpoint-path consistency, and a conditional real
+  training-sample load using `num_workers=0`.
+- Inspected the focused-test import closure and documented a smaller
+  approval-gated Python 3.11 virtual-environment installation command set.
 
 ## Files changed
 
@@ -67,22 +73,22 @@ run successfully in the current environment.
 - Environment proposal and earlier status handoff: `docs/CURRENT_TASK.md` only.
 - Dataset audit: added `audit_person_in_wifi_3d.py` and `docs/DATA_AUDIT.md`;
   updated `docs/CURRENT_TASK.md`.
-- Legacy baseline repair: changed `model/model.py`, `train_pose.py`,
+- Legacy baseline repair: changed `model/model.py`, `train_pose.py`, `utils.py`,
   `config/person_in_wifi_3d/pose_config.yaml`,
   `data/person_in_wifi_3d/process.py`, and `feeder/person_in_wifi_3d.py`; added
   `tests/test_legacy_baseline.py`; updated this handoff.
-- No requirement manifest files were materialized; they remain proposal text in
-  this handoff.
+- No requirement manifest files were materialized; installation commands are
+  documented for approval instead.
 - `docs/EXPERIMENT_LOG.md` was not created because no experiments were run.
 
 ## Repository and Git findings
 
-- Current commit, rechecked during this handoff update:
-  `8432b2a6547c59b92be323a3a38284dd88d1392c`.
+- Commit `aaeacd5` (`Repair legacy PiW3D baseline smoke path`) was pushed to
+  `kimi/main` and verified on the remote.
 - Branch: `main`, tracking `kimi/main`.
-- Git status before this status-only update showed only
-  `docs/CURRENT_TASK.md` modified by the environment proposal.
-- No dependency manifest or test files were found in the repository.
+- The current Step 3 follow-up changes to `utils.py`, `train_pose.py`,
+  `tests/test_legacy_baseline.py`, and this handoff are local until separately
+  committed and pushed.
 - There is no standalone evaluation command; `train_pose.py` evaluates after
   each training epoch.
 
@@ -372,8 +378,11 @@ clean absent-dataset output. Directory inspection still showed only `process.py`
    pretraining output path.
 3. The processor wrote amplitude and phase but not the feeder's required
    `csi_ap`; it now saves the existing combined `(3, 180, 20)` array as well.
-4. Pose gradient accumulation did not increment `step_count`; it now increments
-   once per device batch, matching pretraining. Loss scaling is unchanged.
+4. Pose gradient accumulation did not increment `step_count`, and its unscaled
+   backward calls summed microbatch means for `steps_per_update > 1`. The loop
+   now increments the counter and divides only accumulated losses by
+   `steps_per_update`; `steps_per_update == 1` returns the original loss object
+   and keeps legacy behavior. The synthetic effective-batch regression passes.
 5. Constant amplitude/phase normalization previously divided by zero. A constant
    component now maps to zeros instead of NaNs; nonconstant min-max behavior is
    unchanged, and other NaN/Inf handling was not broadened.
@@ -394,10 +403,12 @@ clean absent-dataset output. Directory inspection still showed only `process.py`
 
 ### Runtime verification blockers
 
-- The current interpreter lacks `timm`, `cv2`, and other baseline dependencies.
-  The focused suite therefore has import failures before its model/normalization
-  assertions; these are not passing smoke tests.
+- The current interpreter lacks `timm`, `cv2`, and other focused-test
+  dependencies. The four model tests fail at `timm`; the normalization test
+  fails at `cv2`. These import failures are not passing smoke tests.
 - No local training split content or pretrained checkpoint is available.
+- No package has been installed for this follow-up; installation awaits explicit
+  approval of the exact commands below.
 
 ### Still unknown
 
@@ -614,51 +625,104 @@ This confirms only the current interpreter. No tests were available or run.
 
 ## Immediate task
 
-The requested legacy source repairs and focused test implementation are
-complete, but runtime smoke verification is not. Do not start full training.
-First provide a dependency-complete environment, then rerun the focused suite;
-provide existing training data and the pretrained checkpoint before attempting
-the real-sample or pretrained-baseline paths.
+Step 3 remains open and the current repairs are provisional. Do not proceed to
+Step 4, implement research-model behavior, preprocess data, download the full
+dataset, or start full training. The next action is user approval or rejection
+of the exact focused-test environment commands below; nothing has been installed
+for this follow-up.
 
-## Legacy baseline repair checks
+## Focused-test inspection
 
-The pre-fix decoder reproduction attempt was:
-
-```bash
-PYTHONDONTWRITEBYTECODE=1 python -m pytest tests/test_legacy_baseline.py::test_pose_decoder_output_shape_and_finite -q -p no:cacheprovider
-```
-
-It stopped at `ModuleNotFoundError: No module named 'timm'` while importing
-`model/model.py`; it did not reach `ViT_Pose_Decoder.forward()` or reproduce the
-expected `NameError`.
-
-The complete focused suite was attempted with:
+Current full-suite command:
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 python -m pytest tests/test_legacy_baseline.py -q -p no:cacheprovider
 ```
 
-Actual result: `5 failed, 1 passed, 1 skipped`. The four model tests failed at
-the missing `timm` import, and the constant-normalization test failed at the
-missing `cv2` import. The checkpoint-path test passed, and the real-sample test
-skipped because `train_data` is absent. No changed-code assertion was reached by
-the five import-blocked tests.
+Actual result in the current interpreter: **5 failed, 2 passed, 1 skipped**.
 
-After the final real-test update, the lightweight tests were rerun with:
+| Test | Current result | Evidence/reason |
+|---|---|---|
+| `test_mae_forward_backward_on_synthetic_input` | failed | `ModuleNotFoundError: No module named 'timm'` while importing `model.model` |
+| `test_pose_decoder_output_shape_and_finite` | failed | same missing `timm` import |
+| `test_pose_decoder_one_optimization_step` | failed | same missing `timm` import |
+| `test_pose_gradient_accumulation_matches_effective_batch` | passed | accumulated gradients and optimizer result match the full effective batch; `steps_per_update=1` returns the original loss object |
+| `test_checkpoint_save_and_load` | failed | same missing `timm` import |
+| `test_constant_csi_normalization` | failed | `ModuleNotFoundError: No module named 'cv2'` while importing the PiW3D feeder |
+| `test_pretrained_checkpoint_path_is_consistent` | passed | pose YAML path matches the pretraining output path |
+| `test_real_training_sample_preprocessing_and_load` | skipped | `train_data/train_data_list.txt` is absent; no `test_data` was read |
+
+The pre-fix decoder reproduction attempt also stopped at missing `timm`, so the
+expected `NameError` has not been runtime-observed. The current import failures
+are dependency blockers, not evidence that the changed-code assertions pass.
+
+### Minimal dependencies for this focused suite
+
+The tests directly require NumPy, PyTorch, pytest, and PyYAML. Importing
+`model.model` additionally requires `timm`, `einops`, and torchvision. Importing
+`feeder.person_in_wifi_3d` eagerly requires SciPy, OpenCV, scikit-learn, pandas,
+h5py, and PyWavelets. The focused suite does not import `mat73` or TensorBoard.
+
+Use the existing 64-bit Python 3.11.0 interpreter (`pip 23.2.1`, `venv`
+available) to create a dedicated environment outside the repository:
+`C:\Users\vaska\venvs\compwifi-piw3d-py311`.
+
+### Exact approval-gated installation commands
+
+Do not run these commands until approved:
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 python -m pytest tests/test_legacy_baseline.py::test_pretrained_checkpoint_path_is_consistent tests/test_legacy_baseline.py::test_real_training_sample_preprocessing_and_load -q -p no:cacheprovider
+PY311="/c/Users/vaska/AppData/Local/Programs/Python/Python311/python.exe"
+VENV="/c/Users/vaska/venvs/compwifi-piw3d-py311"
+
+"$PY311" -m venv "$VENV"
+"$VENV/Scripts/python.exe" -m pip install --only-binary=:all: --index-url https://download.pytorch.org/whl/cu121 torch==2.5.1 torchvision==0.20.1
+"$VENV/Scripts/python.exe" -m pip install --only-binary=:all: numpy==1.26.4 pytest==8.3.4 PyYAML==6.0.2 timm==0.9.16 einops==0.8.0 scipy==1.14.1 opencv-python==4.9.0.80 scikit-learn==1.5.2 pandas==2.2.3 h5py==3.12.1 PyWavelets==1.8.0
 ```
 
-Actual result: `1 passed, 1 skipped`.
+The listed direct packages are the complete focused-test set. Pip will also
+install their required transitive dependencies; actual versions must be recorded
+with `pip freeze` after installation.
+
+### Exact post-install verification commands
+
+After approval and installation, run from the repository root:
+
+```bash
+VENV="/c/Users/vaska/venvs/compwifi-piw3d-py311"
+"$VENV/Scripts/python.exe" --version
+"$VENV/Scripts/python.exe" -m pip --version
+"$VENV/Scripts/python.exe" -m pip check
+"$VENV/Scripts/python.exe" -m pip freeze
+"$VENV/Scripts/python.exe" -c "import torch; print('torch:', torch.__version__); print('CUDA build:', torch.version.cuda); print('CUDA available:', torch.cuda.is_available()); print('GPU:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'none')"
+PYTHONDONTWRITEBYTECODE=1 "$VENV/Scripts/python.exe" -m pytest tests/test_legacy_baseline.py -q -p no:cacheprovider
+```
+
+Report every test individually. If any changed-code assertion fails, show the
+failure and propose the smallest fix before editing. Do not remove imports,
+weaken tests, use official `test_data`, preprocess the full dataset, or start
+training.
+
+## Legacy baseline repair checks
+
+The complete focused suite was attempted with the command above and produced
+`5 failed, 2 passed, 1 skipped`. The new accumulation test was also run alone:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python -m pytest tests/test_legacy_baseline.py::test_pose_gradient_accumulation_matches_effective_batch -q -p no:cacheprovider
+```
+
+Actual result: `1 passed`. It compares two scaled microbatch backward passes
+with one full-effective-batch backward pass and optimizer step, and verifies the
+`steps_per_update=1` path is the identity.
 
 Syntax was checked without importing project dependencies or writing bytecode:
 
 ```bash
-python -c "from pathlib import Path; paths = ['model/model.py', 'feeder/person_in_wifi_3d.py', 'data/person_in_wifi_3d/process.py', 'train_pose.py', 'tests/test_legacy_baseline.py']; [compile(Path(path).read_text(encoding='utf-8'), path, 'exec') for path in paths]; print('Syntax OK:', ', '.join(paths))"
+python -c "from pathlib import Path; paths = ['model/model.py', 'feeder/person_in_wifi_3d.py', 'data/person_in_wifi_3d/process.py', 'train_pose.py', 'utils.py', 'tests/test_legacy_baseline.py']; [compile(Path(path).read_text(encoding='utf-8'), path, 'exec') for path in paths]; print('Syntax OK:', ', '.join(paths))"
 ```
 
-Actual result: `Syntax OK` for all five files. `git diff --check` completed with
+Actual result: `Syntax OK` for all six files. `git diff --check` completed with
 no output. No preprocessing, training entry point, evaluation, package
 installation, or environment creation was run.
 
@@ -670,14 +734,21 @@ returns a same-shaped zero array. Previously this case divided by zero and
 produced NaNs with a runtime warning. No additional NaN/Inf sanitization was
 introduced.
 
+### Gradient accumulation behavior
+
+For `steps_per_update > 1`, each microbatch mean loss is divided by
+`steps_per_update` before backward, so equal-sized microbatches reproduce the
+full-effective-batch mean gradient instead of a sum of means. For
+`steps_per_update == 1`, the helper returns the original loss tensor unchanged,
+preserving the legacy single-device-batch path.
+
 ## Next recommended task
 
-After approval of the previously proposed environment setup, create and verify
-the dependency-complete baseline environment and rerun
-`python -m pytest tests/test_legacy_baseline.py -q`. When an existing dataset is
-available, rerun the read-only audit and the real training-sample test with
-`PIW3D_DATA_ROOT` set to that root. Do not run whole-dataset preprocessing or
-full training automatically.
+Wait for approval of the exact installation commands above. After approval,
+install only that approved set, record actual Python/package versions, rerun the
+complete focused suite, and report each test individually. If all synthetic
+checks pass and training data is supplied, run only the conditional real
+training-sample check; do not begin Step 4 or full training automatically.
 
 ## Progress log
 
@@ -699,3 +770,8 @@ full training automatically.
   tests. Recorded the constant-to-zero normalization change. Syntax, path, and
   diff checks passed; the real-data test skipped and model/normalization runtime
   tests remained blocked by missing dependencies. No full training was started.
+- 2026-11-04: Reopened Step 3, inspected every focused test result, identified
+  the minimal test import closure, and documented exact approval-gated Python
+  3.11 environment commands without installing anything. Added and passed a
+  synthetic effective-batch gradient-accumulation test while preserving the
+  `steps_per_update=1` identity path.

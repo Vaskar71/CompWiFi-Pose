@@ -111,6 +111,85 @@ def test_pose_decoder_one_optimization_step():
     )
 
 
+def test_pose_gradient_accumulation_matches_effective_batch():
+    import copy
+
+    from utils import scale_loss_for_accumulation
+
+    torch.manual_seed(0)
+    inputs = torch.randn(4, 5)
+    targets = torch.randn(4, 3)
+    full_model = torch.nn.Linear(5, 3)
+    accumulated_model = copy.deepcopy(full_model)
+    single_step_model = copy.deepcopy(full_model)
+    full_optimizer = torch.optim.SGD(full_model.parameters(), lr=0.1)
+    accumulated_optimizer = torch.optim.SGD(accumulated_model.parameters(), lr=0.1)
+    single_step_optimizer = torch.optim.SGD(single_step_model.parameters(), lr=0.1)
+
+    full_optimizer.zero_grad()
+    full_loss = torch.mean(torch.norm(full_model(inputs) - targets, dim=-1))
+    full_loss.backward()
+
+    steps_per_update = 2
+    step_count = 0
+    accumulated_optimizer.zero_grad()
+    for start in range(0, inputs.shape[0], inputs.shape[0] // steps_per_update):
+        stop = start + inputs.shape[0] // steps_per_update
+        step_count += 1
+        microbatch_loss = torch.mean(
+            torch.norm(accumulated_model(inputs[start:stop]) - targets[start:stop], dim=-1)
+        )
+        scaled_loss = scale_loss_for_accumulation(microbatch_loss, steps_per_update)
+        assert scaled_loss is not microbatch_loss
+        scaled_loss.backward()
+        if step_count % steps_per_update == 0:
+            accumulated_optimizer.step()
+
+    for (full_name, full_parameter), (_, accumulated_parameter) in zip(
+        full_model.named_parameters(), accumulated_model.named_parameters()
+    ):
+        torch.testing.assert_close(
+            full_parameter.grad,
+            accumulated_parameter.grad,
+            rtol=1e-6,
+            atol=1e-7,
+            msg=f"accumulated gradient mismatch for {full_name}",
+        )
+    accumulated_optimizer.zero_grad()
+
+    full_optimizer.step()
+    for (full_name, full_parameter), (_, accumulated_parameter) in zip(
+        full_model.named_parameters(), accumulated_model.named_parameters()
+    ):
+        torch.testing.assert_close(
+            full_parameter,
+            accumulated_parameter,
+            rtol=1e-6,
+            atol=1e-7,
+            msg=f"accumulated parameter mismatch for {full_name}",
+        )
+
+    single_step_optimizer.zero_grad()
+    single_step_loss = torch.mean(
+        torch.norm(single_step_model(inputs) - targets, dim=-1)
+    )
+    scaled_single_step_loss = scale_loss_for_accumulation(single_step_loss, 1)
+    assert scaled_single_step_loss is single_step_loss
+    scaled_single_step_loss.backward()
+    single_step_optimizer.step()
+
+    for (full_name, full_parameter), (_, single_step_parameter) in zip(
+        full_model.named_parameters(), single_step_model.named_parameters()
+    ):
+        torch.testing.assert_close(
+            full_parameter,
+            single_step_parameter,
+            rtol=1e-6,
+            atol=1e-7,
+            msg=f"steps_per_update=1 parameter mismatch for {full_name}",
+        )
+
+
 def test_checkpoint_save_and_load(tmp_path):
     from model.model import ViT_Pose_Decoder
 

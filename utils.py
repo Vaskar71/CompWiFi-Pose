@@ -12,6 +12,14 @@ def setup_seed(seed=42):
     torch.backends.cudnn.deterministic = True
 
 
+def scale_loss_for_accumulation(loss, steps_per_update):
+    if steps_per_update < 1:
+        raise ValueError('steps_per_update must be at least 1')
+    if steps_per_update == 1:
+        return loss
+    return loss / steps_per_update
+
+
 # 对3D姿态、原始WiFi信号和提取WiFi特征进行质量评估
 def evaluate_clustering_quality(wifi, wifi_features, labels):
     wifi = wifi.reshape(wifi.shape[0], -1)

@@ -222,7 +222,7 @@ if __name__ == '__main__':
             
             loss_mpjpe = torch.mean(torch.norm(predicted_pose-pose_gt, dim=-1))
             loss = loss_mpjpe
-            loss.backward()
+            scale_loss_for_accumulation(loss, steps_per_update).backward()
             if step_count % steps_per_update == 0:
                 optim.step()
                 optim.zero_grad()
