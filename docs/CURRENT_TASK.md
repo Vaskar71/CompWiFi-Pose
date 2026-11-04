@@ -1,18 +1,75 @@
 # Current Task and Project Status
 
+## Dataset acquisition and audit status (2026-11-05)
+
+The public Wiception3D / Person-in-WiFi-3D dataset has been downloaded,
+extracted, and audited read-only. Download, extraction, placement, list/file
+pairing checks, and bounded real-array inspection are complete.
+
+- Source URL: https://www.kaggle.com/datasets/xjtuqianbo/wiception3d
+  (public, authentication-free download; no credentials used or requested).
+- Download date: 2026-11-04 (local time, Asia/Dhaka).
+- Archive: `data/_downloads/wiception3d_archive.zip`
+  (server-served name `archive.zip`), 16,809,368,215 bytes
+  (~15.65 GiB), verified byte-identical to the server Content-Range total.
+  Method: 10 resumable HTTP range chunks via standard-library Python
+  (threaded urllib), concatenated in order; `zipfile.is_zipfile` passed.
+- Extraction location: `data/person_in_wifi_3d/` using a skip-if-exists
+  extractor (no overwrites). Result: 293,312 files extracted, 0 skipped,
+  18,689,284,877 bytes decompressed. `data/person_in_wifi_3d/process.py`
+  is unchanged (4421 bytes, original timestamp) and remains tracked by Git.
+- Confirmed actual PIW3D_DATA_ROOT (directory directly containing `train_data`
+  and `test_data`): `data/person_in_wifi_3d/wifi_dataset`. The archive introduces
+  one wrapper directory level (`wifi_dataset/`); nothing was renamed.
+- Actual inventory: train has 89,946 unique listed IDs and test has 7,824. Each
+  listed ID has its raw CSI `.mat` and keypoint `.npy`; there are 0 missing or
+  unlisted raw CSI/keypoint files and 0 listed CSI-without-keypoint cases. Each
+  split also has one SMPL `.npz` per listed ID. Total inventory is 293,312 files.
+- Filename-derived audit-only person-count categories: train one/two/three =
+  28,121/36,242/25,583; test = 2,586/3,184/2,054. The 12 sampled IDs per split
+  cover all three categories, and every sampled pose's person dimension agrees
+  with its filename-derived count. These counts must never be exposed to an
+  unlabelled training loader.
+- All 24 sampled raw CSI files have stored shape `(20, 30, 3, 3)` and compound
+  float64 real/imag fields; audit interpretation gives `(3, 3, 30, 20)`. All 24
+  sampled poses are float64 `(people, 14, 3)`. No sampled raw CSI or pose array
+  contains NaN/Inf. These are bounded content checks, not a full-dataset scan.
+- `csi_ap`, `csi_amplitude`, and `csi_phase` are absent for every listed ID in
+  both splits. The existing feeder therefore cannot yet consume the extracted
+  data. Constant normalization cases and equality between `csi_ap` and
+  concatenated amplitude/phase are unmeasured; no preprocessing was run.
+- Sequence analysis found 215 train and 195 test candidate keys, with 195 keys
+  shared across the official split and 0 exact listed-ID overlap. Grouped
+  train/development splitting is provisionally possible by filename key, but
+  recording/subject/environment semantics and pose units/joint ordering/
+  coordinate conventions remain unknown.
+- Full evidence, exact commands, ranges, next-frame gaps, and the **YELLOW**
+  readiness assessment are in `docs/DATA_AUDIT.md`.
+- Git: `data/_downloads` added to `.gitignore`; the archive and the extracted
+  tree are ignored (`git check-ignore` verified). `process.py` negations
+  intact; both `data/*/process.py` remain tracked.
+- Disk: ~70 GB free on J: after download + extraction.
+
 ## Current phase
 
-Phase 0 environment setup and Step 3 baseline smoke verification remain open.
-The current repairs are provisional: dependency-independent checks now pass for
-checkpoint-path consistency and effective-batch gradient accumulation, but model
-and feeder runtime tests remain blocked by missing packages. The real-data audit
-and real-sample test remain blocked because no Person-in-WiFi-3D split content is
-available locally; no pretrained checkpoint is present either.
+Phase 0 focused-test environment setup is complete. The dedicated environment at
+`C:\Users\vaska\venvs\compwifi-piw3d-py311` uses Python 3.11.0, pip 24.3.1,
+PyTorch 2.5.1+cu121, and torchvision 0.20.1+cu121. `pip check` reported no broken
+requirements; CUDA is available on the NVIDIA GeForce RTX 3080 Laptop GPU. The
+complete focused suite produced **7 passed, 1 skipped** with no import-related
+failures. The exact tested package set is saved in
+`requirements/focused-test-py311-lock.txt`.
 
-No package installation, environment creation, baseline training, dataset
-preprocessing, evaluation, or experiment was started. Step 3 must not close until
-the complete focused suite runs in the approved dedicated environment and every
-dependency-independent test genuinely passes.
+The Phase 1 read-only structural and bounded-content audit is complete with a
+YELLOW readiness assessment. Phase 1 is not fully exited because correct pose
+visualization/conventions have not been validated. Step 3 baseline smoke
+verification remains open: raw training data is now present, but feeder-required
+`csi_ap` is absent and the conditional real-sample preprocessing/load test was
+not rerun. No pretrained checkpoint is present. No baseline training, dataset
+preprocessing, evaluation, or experiment was started. This is a focused-test
+environment only, not a training-readiness claim: TensorBoard, `mat73`, and the
+training-entry-point imports have not been separately verified. Do not begin
+Step 4.
 
 ## Completed work
 
@@ -46,9 +103,11 @@ dependency-independent test genuinely passes.
   modify any training loader.
 - Verified syntax, CLI help, clean absent-dataset behavior, report generation,
   and refusal to write a report inside the dataset root.
-- Generated `docs/DATA_AUDIT.md` from the actual local state. It records the
-  absent dataset and static processor/feeder incompatibility without inventing
-  real-data schema, values, units, or metadata.
+- Initially generated `docs/DATA_AUDIT.md` for the absent-dataset state, then
+  completed the real-data audit after extraction. The report now separates full
+  list/file measurements, bounded array-content measurements, source-code
+  expectations, and unknown units/conventions. It assigns YELLOW readiness and
+  records the exact dedicated-environment commands.
 - Replaced the undefined pose-decoder `feature.device` reference with `x.device`.
   A pre-fix runtime reproduction was attempted but stopped at the missing `timm`
   import, so the expected `NameError` was not observed.
@@ -66,19 +125,27 @@ dependency-independent test genuinely passes.
   training-sample load using `num_workers=0`.
 - Inspected the focused-test import closure and documented a smaller
   approval-gated Python 3.11 virtual-environment installation command set.
+- Created the dedicated environment, upgraded pip to 24.3.1 after separate
+  approval, installed the approved focused dependencies, verified the runtime,
+  and reran the complete suite: 7 passed and 1 skipped, with no import failures.
+- Saved the exact successfully tested package set as
+  `requirements/focused-test-py311-lock.txt`.
 
 ## Files changed
 
 - Read-only inspection: no files changed.
 - Environment proposal and earlier status handoff: `docs/CURRENT_TASK.md` only.
-- Dataset audit: added `audit_person_in_wifi_3d.py` and `docs/DATA_AUDIT.md`;
-  updated `docs/CURRENT_TASK.md`.
+- Dataset audit tooling: added `audit_person_in_wifi_3d.py` and
+  `docs/DATA_AUDIT.md`; updated `docs/CURRENT_TASK.md`.
+- Real-data audit (this task): updated `docs/DATA_AUDIT.md` and
+  `docs/CURRENT_TASK.md` only. No source, test, or dataset file was changed.
 - Legacy baseline repair: changed `model/model.py`, `train_pose.py`, `utils.py`,
   `config/person_in_wifi_3d/pose_config.yaml`,
   `data/person_in_wifi_3d/process.py`, and `feeder/person_in_wifi_3d.py`; added
   `tests/test_legacy_baseline.py`; updated this handoff.
-- No requirement manifest files were materialized; installation commands are
-  documented for approval instead.
+- Focused-test setup: added `requirements/focused-test-py311-lock.txt`; updated
+  `docs/CURRENT_TASK.md` and the static `csi_ap` statement in
+  `docs/DATA_AUDIT.md`. No source or test changes were needed after installation.
 - `docs/EXPERIMENT_LOG.md` was not created because no experiments were run.
 
 ## Repository and Git findings
@@ -307,77 +374,129 @@ After adding shell quoting to the generated rerun instructions, the syntax check
 and audit were rerun with the quoted absolute paths and completed with the same
 clean absent-dataset output. Directory inspection still showed only `process.py`.
 
+### Real-data audit execution (2026-11-05)
+
+The following commands were run from the repository root using the existing
+dedicated environment. The script and CLI were inspected before data loading.
+Root confirmation succeeded and verified that the supplied root directly
+contains both splits and both list files:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 /c/Users/vaska/venvs/compwifi-piw3d-py311/Scripts/python.exe -c "from pathlib import Path; root = Path('data/person_in_wifi_3d/wifi_dataset').resolve(); print('PIW3D_DATA_ROOT:', root); print('root is directory:', root.is_dir()); print('train_data is directory:', (root / 'train_data').is_dir()); print('test_data is directory:', (root / 'test_data').is_dir()); print('train list is file:', (root / 'train_data' / 'train_data_list.txt').is_file()); print('test list is file:', (root / 'test_data' / 'test_data_list.txt').is_file()); assert root.is_dir() and (root / 'train_data').is_dir() and (root / 'test_data').is_dir()"
+```
+
+Actual root: `J:\Zero-shot 3D Multi-person Pose Estimation\data\person_in_wifi_3d\wifi_dataset`; all five printed existence checks were true.
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 /c/Users/vaska/venvs/compwifi-piw3d-py311/Scripts/python.exe audit_person_in_wifi_3d.py --help
+```
+
+Help completed successfully and showed required `--data_root`/`--output` and
+bounded `--max_samples` (default 6).
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 /c/Users/vaska/venvs/compwifi-piw3d-py311/Scripts/python.exe -c "from pathlib import Path; import audit_person_in_wifi_3d as a; root = Path('data/person_in_wifi_3d/wifi_dataset'); exec('for split, dirname in a.SPLITS.items():\n sample_list = a.load_sample_list(root / dirname, split)\n selected = a.select_samples(sample_list[\"unique_ids\"], 12)\n print(split, \"filename-derived counts:\", dict(sorted(sample_list[\"filename_counts\"].items(), key=lambda item: (item[0] is None, str(item[0])))))\n print(split, \"selected IDs:\", selected)\n print(split, \"selected counts:\", [a.filename_info(sample_id)[\"person_count\"] for sample_id in selected])\n assert {1, 2, 3}.issubset({a.filename_info(sample_id)[\"person_count\"] for sample_id in selected})')"
+```
+
+The representative-selection assertions passed. Both 12-ID selections contain
+one-, two-, and three-person filename categories. The exact selected IDs and
+count output are recorded in `docs/DATA_AUDIT.md`.
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 /c/Users/vaska/venvs/compwifi-piw3d-py311/Scripts/python.exe audit_person_in_wifi_3d.py --data_root data/person_in_wifi_3d/wifi_dataset --output docs/DATA_AUDIT.md --max_samples 12
+```
+
+Actual output: `Audit report written to: J:\Zero-shot 3D Multi-person Pose Estimation\docs\DATA_AUDIT.md`. Exit code was 0. Only the requested report was
+written; no dataset file was created, modified, or preprocessed.
+
 ## Actual test and execution outcomes
 
-- No tests were run; no test files were found during the repository search.
-- No environment creation, dependency resolver dry-run, package installation,
-  Python 3.11 import, or proposed-environment CUDA verification was run.
-- No preprocessing, pretraining, pose training, evaluation, or full training
-  command was run.
-- No model forward pass, loss calculation, backward pass, optimizer update,
-  checkpoint save/reload, or tiny-overfitting test was run.
-- No experimental results or baseline performance numbers exist yet.
-- `git diff --check -- docs/CURRENT_TASK.md` completed successfully with no
-  output; this validates only the documentation diff.
-- The command failures and static code findings below must not be represented
-  as successful runtime reproductions.
+- The dedicated Python 3.11 environment was created and all approved focused-test
+  dependencies were installed after the separately approved pip upgrade.
+- The complete focused suite ran successfully: 7 passed, 1 skipped, and one
+  external `timm` deprecation warning. Every test is itemized below.
+- Synthetic forward/backward, optimizer update, checkpoint save/reload, gradient
+  accumulation, and normalization checks passed. No changed-code assertion
+  failed, so no post-install source repair was made.
+- The earlier real-training-sample test skipped when the training list was
+  absent. It was not rerun during this audit, and the feeder-required `csi_ap`
+  files remain absent. No tiny-overfitting or full training run was performed.
+- The real-data audit itself completed successfully: full-list existence and
+  pairing checks passed, and all 24 sampled raw CSI plus 24 sampled keypoint
+  files loaded with finite values. No pytest suite was rerun because this task
+  changed documentation only.
+- No preprocessing, pretraining, pose training, evaluation, or experiment was
+  run. No experimental results or baseline performance numbers exist yet.
+- Training-entry-point imports, TensorBoard, and `mat73` were not verified; the
+  environment must not yet be described as training-ready.
 
 ## Newly discovered dataset facts
 
-- The configured local dataset directories do not contain dataset content;
-  they contain only preprocessing scripts.
-- Person-in-WiFi-3D YAML defaults to `data/person_in_wifi_3d`, but no verified
-  external dataset path is configured.
+- The actual root is `data/person_in_wifi_3d/wifi_dataset/`; train/test list
+  sizes are 89,946/7,824 unique IDs with no duplicate entries. The archive is
+  kept in `data/_downloads/`.
+- All listed raw CSI and keypoint files are present with zero missing, unlisted,
+  or CSI-without-keypoint cases. SMPL `.npz` files also match the physical counts,
+  but their contents were outside this audit's array-content checks.
+- Filename-derived train one/two/three-person counts are 28,121/36,242/25,583;
+  test counts are 2,586/3,184/2,054. All sampled pose person dimensions match.
+  This encoding remains audit-only and forbidden as an unlabelled training signal.
+- Sampled raw CSI uses HDF5 variable `csi_out`, stored shape `(20, 30, 3, 3)`, and
+  compound little-endian float64 real/imag fields. Audit interpretation produces
+  `(3, 3, 30, 20)` complex128. Across both 12-sample sets, real/imag/magnitude
+  ranges are `[-67, 65]`, `[-69, 63]`, and `[0, 73.736]`, respectively.
+- Sampled poses are float64 `(people, 14, 3)` with combined range
+  `[-0.171579, 4.10975]`. No sampled raw CSI or pose contains NaN/Inf. Content
+  statistics are bounded to the samples, not dataset-wide integrity claims.
 - The Person-in-WiFi-3D loader expects `train_data/csi_ap/*.npy` and
-  `test_data/csi_ap/*.npy`.
-- `data/person_in_wifi_3d/process.py` writes `csi_amplitude` and `csi_phase`,
-  while its `csi_ap` writing block is commented out. Unless the original
-  package already supplies `csi_ap`, the documented preprocessing and loader
-  are incompatible.
-- The loader derives person-count filtering and `person_num` from filenames
-  and loaded pose arrays. This encoding has not been validated against real
-  data and must not be used as a forbidden zero-label training signal.
-- Actual dataset schema, MATLAB variables, tensor shapes on disk, joint order,
-  coordinate units, person-count representation, and recording/subject/
-  environment metadata remain unknown until real data is audited.
-- No new dataset files, schema, or metadata were inspected during the
-  environment-proposal task; the dataset findings above remain unchanged.
+  `test_data/csi_ap/*.npy`; those and the separate amplitude/phase arrays are
+  absent for every listed ID. `data/person_in_wifi_3d/process.py:99-102` contains
+  an enabled `csi_ap` save, but it was not run and its real-data output remains
+  unverified. Constant normalization frequency and concatenation equality are
+  therefore unknown.
+- Candidate sequence keys produce 215 train groups and 195 test groups. Train has
+  2,032 IDs without an immediate successor on the unfiltered list. All 195 test
+  candidate keys overlap train keys, while exact listed-ID overlap is zero.
+  Filename-grouped train/development splitting is provisionally possible, but no
+  recording-, subject-, or environment-disjoint claim is supported yet.
+- Pose units, joint ordering, coordinate axes/origin/frame, and candidate sequence
+  semantics remain unknown. The audit found no metadata establishing them and did
+  not perform visualization. Overall readiness is YELLOW; see `docs/DATA_AUDIT.md`.
 
 ## Newly discovered environment facts
 
-- The current interpreter is Python 3.14.0 with PyTorch 2.11.0+cu128.
-- PyTorch reports CUDA availability on one 16 GB RTX 3080 Laptop GPU.
-- The current interpreter lacks several required package distributions, so it
-  cannot run the repository as-is.
-- The repository contains no materialized dependency manifest or environment
-  pins. The exact pins below are only a proposal in this handoff.
-- Conda is unavailable on the current Bash `PATH`.
+- The system interpreter remains Python 3.14.0 with PyTorch 2.11.0+cu128; the
+  dedicated focused-test environment separately uses Python 3.11.0, pip 24.3.1,
+  PyTorch 2.5.1+cu121, and torchvision 0.20.1+cu121.
+- In the dedicated environment, `pip check` found no broken requirements, CUDA
+  12.1 availability was true, and the GPU name was NVIDIA GeForce RTX 3080
+  Laptop GPU. This diagnostic did not run a CUDA computation or training.
+- The exact tested focused package set is materialized in
+  `requirements/focused-test-py311-lock.txt`. The older candidate manifests below
+  remain historical proposals and were not materialized or installed.
+- Conda is unavailable on the current Bash `PATH`; the approved environment used
+  the existing 64-bit CPython 3.11.0 interpreter and `venv` instead.
 - The unmodified PiW3D entry points import all three dataset feeders;
   `train_pose.py` additionally imports MetaFi and HPE-Li. Consequently,
-  `mat73`, SciPy, OpenCV, pandas, h5py, and PyWavelets belong to the unmodified
-  baseline import closure even when their functionality is not called.
-- `xxsubtype` is provided as a built-in by the current CPython 3.14
-  interpreter. This does not verify its availability under the proposed
-  CPython 3.11 environment, and it is not a PyPI package to install.
-- The official PyTorch archive lists torch 2.5.1/torchvision 0.20.1 with the
-  CUDA 12.1 wheel index for Windows. No local installation or GPU execution of
-  that pairing has been attempted.
-- PyPI metadata for `mat73==0.65` provides a `py3-none-any` wheel but no
-  `Requires-Python` constraint; Python 3.11 runtime compatibility is unverified.
-- Package/version compatibility, including native Windows wheel resolution,
-  `timm` APIs, transitive dependencies, and whole-model `torch.load` behavior,
-  remains unverified.
+  `mat73` and TensorBoard remain outside this focused-test setup even though they
+  belong to the full training-entry-point import closure.
+- The focused tests verified the legacy `timm` import paths and whole-model
+  `torch.load` checkpoint round-trip on CPU. They emitted one deprecation warning
+  for `timm.models.layers`; this did not fail the suite.
+- Full training-entry-point imports, `mat73`, TensorBoard, GPU kernel execution,
+  and real-data compatibility remain unverified.
 
 ## Current errors, blockers, and uncertainties
 
 ### Legacy findings resolved in this task
 
 1. `ViT_Pose_Decoder.forward()` used undefined `feature.device`; it now uses
-   `x.device`. Runtime verification remains blocked by the missing `timm` import.
+   `x.device`. Synthetic output, optimization, and checkpoint tests now pass.
 2. The PiW3D pose checkpoint path omitted `all-person`; it now matches the
-   pretraining output path.
+   pretraining output path, and its consistency test passes.
 3. The processor wrote amplitude and phase but not the feeder's required
    `csi_ap`; it now saves the existing combined `(3, 180, 20)` array as well.
+   Real-data output compatibility remains unverified.
 4. Pose gradient accumulation did not increment `step_count`, and its unscaled
    backward calls summed microbatch means for `steps_per_update > 1`. The loop
    now increments the counter and divides only accumulated losses by
@@ -385,7 +504,8 @@ clean absent-dataset output. Directory inspection still showed only `process.py`
    and keeps legacy behavior. The synthetic effective-batch regression passes.
 5. Constant amplitude/phase normalization previously divided by zero. A constant
    component now maps to zeros instead of NaNs; nonconstant min-max behavior is
-   unchanged, and other NaN/Inf handling was not broadened.
+   unchanged, and other NaN/Inf handling was not broadened. Its regression test
+   passes.
 
 ### Remaining code/protocol issues
 
@@ -403,20 +523,23 @@ clean absent-dataset output. Directory inspection still showed only `process.py`
 
 ### Runtime verification blockers
 
-- The current interpreter lacks `timm`, `cv2`, and other focused-test
-  dependencies. The four model tests fail at `timm`; the normalization test
-  fails at `cv2`. These import failures are not passing smoke tests.
-- No local training split content or pretrained checkpoint is available.
-- No package has been installed for this follow-up; installation awaits explicit
-  approval of the exact commands below.
+- The focused dependency import failures are resolved; all seven runnable tests
+  passed in the dedicated environment's earlier run.
+- Raw train/test content is now present and audited, but no pretrained checkpoint
+  or feeder-required `csi_ap` is available. The real-sample test was not rerun,
+  so Step 3 remains open.
+- TensorBoard, `mat73`, and training-entry-point imports remain separately
+  unverified. No training-readiness claim is made.
 
 ### Still unknown
 
-- Whether a dataset is downloaded elsewhere and whether the public package
-  matches DT-Pose preprocessing.
-- Actual dataset schema, joint ordering, coordinate units, and metadata.
-- Whether a dedicated compatible environment can run all entry points.
-- Whether additional runtime blockers remain once dependencies are available.
+- Processed amplitude/phase/`csi_ap` shapes, ranges, constant-case frequency,
+  concatenation equality, and compatibility with the real feeder.
+- Full-dataset file readability and NaN/Inf status beyond the bounded samples.
+- Pose units, joint ordering, coordinate conventions, and validated visualization.
+- Recording, subject, and environment semantics of filename-derived sequence keys.
+- Whether the dedicated environment can run all entry points and whether further
+  runtime blockers remain once dependencies are available.
 - Baseline reproduction accuracy and zero-label compositional viability.
 
 ## Proposed Phase 0 environment plan (not executed)
@@ -625,36 +748,47 @@ This confirms only the current interpreter. No tests were available or run.
 
 ## Immediate task
 
-Step 3 remains open and the current repairs are provisional. Do not proceed to
-Step 4, implement research-model behavior, preprocess data, download the full
-dataset, or start full training. The next action is user approval or rejection
-of the exact focused-test environment commands below; nothing has been installed
-for this follow-up.
+The requested read-only real-data audit is complete. The actual root, CLI,
+representative one-/two-/three-person samples, full-list pairing, bounded array
+contents, sequence structure, and readiness are documented in
+`docs/DATA_AUDIT.md`; the dataset is YELLOW overall. Stop after the audit as
+requested. Do not preprocess, train, evaluate, or begin Step 4 automatically.
+Before any later training, separately approve and verify the remaining entry-point
+dependencies and imports, including TensorBoard and `mat73`.
 
 ## Focused-test inspection
 
-Current full-suite command:
+Executed full-suite command in the dedicated environment:
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 python -m pytest tests/test_legacy_baseline.py -q -p no:cacheprovider
+VENV="/c/Users/vaska/venvs/compwifi-piw3d-py311"
+PYTHONDONTWRITEBYTECODE=1 "$VENV/Scripts/python.exe" -m pytest tests/test_legacy_baseline.py -q -p no:cacheprovider
 ```
 
-Actual result in the current interpreter: **5 failed, 2 passed, 1 skipped**.
+Actual summary:
 
-| Test | Current result | Evidence/reason |
+```text
+.......s                                                                 [100%]
+7 passed, 1 skipped, 1 warning in 23.33s
+```
+
+The warning was an external `timm.models.layers` deprecation warning, not an
+import error or test failure. Individual results:
+
+| Test | Result | Evidence/reason |
 |---|---|---|
-| `test_mae_forward_backward_on_synthetic_input` | failed | `ModuleNotFoundError: No module named 'timm'` while importing `model.model` |
-| `test_pose_decoder_output_shape_and_finite` | failed | same missing `timm` import |
-| `test_pose_decoder_one_optimization_step` | failed | same missing `timm` import |
-| `test_pose_gradient_accumulation_matches_effective_batch` | passed | accumulated gradients and optimizer result match the full effective batch; `steps_per_update=1` returns the original loss object |
-| `test_checkpoint_save_and_load` | failed | same missing `timm` import |
-| `test_constant_csi_normalization` | failed | `ModuleNotFoundError: No module named 'cv2'` while importing the PiW3D feeder |
-| `test_pretrained_checkpoint_path_is_consistent` | passed | pose YAML path matches the pretraining output path |
+| `test_mae_forward_backward_on_synthetic_input` | passed | Synthetic forward, finite loss, backward, and finite-gradient assertions passed |
+| `test_pose_decoder_output_shape_and_finite` | passed | Pose/feature shapes and finite outputs passed |
+| `test_pose_decoder_one_optimization_step` | passed | Finite loss, backward, optimizer step, and parameter-change assertions passed |
+| `test_pose_gradient_accumulation_matches_effective_batch` | passed | Accumulated gradients and optimizer result matched the full effective batch; single-step identity passed |
+| `test_checkpoint_save_and_load` | passed | Whole-model checkpoint round-trip and restored-decoder output checks passed |
+| `test_constant_csi_normalization` | passed | Constant amplitude mapped to zero; phase normalization and finite-output checks passed |
+| `test_pretrained_checkpoint_path_is_consistent` | passed | Pose YAML path matched the pretraining output path |
 | `test_real_training_sample_preprocessing_and_load` | skipped | `train_data/train_data_list.txt` is absent; no `test_data` was read |
 
-The pre-fix decoder reproduction attempt also stopped at missing `timm`, so the
-expected `NameError` has not been runtime-observed. The current import failures
-are dependency blockers, not evidence that the changed-code assertions pass.
+There were no remaining import-related failures. No changed-code assertion
+failed, so no post-install repair, affected-test rerun, or second full-suite
+rerun was necessary. No source or test file was modified during verification.
 
 ### Minimal dependencies for this focused suite
 
@@ -663,30 +797,28 @@ The tests directly require NumPy, PyTorch, pytest, and PyYAML. Importing
 `feeder.person_in_wifi_3d` eagerly requires SciPy, OpenCV, scikit-learn, pandas,
 h5py, and PyWavelets. The focused suite does not import `mat73` or TensorBoard.
 
-Use the existing 64-bit Python 3.11.0 interpreter (`pip 23.2.1`, `venv`
-available) to create a dedicated environment outside the repository:
-`C:\Users\vaska\venvs\compwifi-piw3d-py311`.
+The environment was created outside the repository from the existing 64-bit
+Python 3.11.0 interpreter at `C:\Users\vaska\venvs\compwifi-piw3d-py311`.
 
-### Exact approval-gated installation commands
-
-Do not run these commands until approved:
+### Executed installation commands
 
 ```bash
 PY311="/c/Users/vaska/AppData/Local/Programs/Python/Python311/python.exe"
 VENV="/c/Users/vaska/venvs/compwifi-piw3d-py311"
-
 "$PY311" -m venv "$VENV"
 "$VENV/Scripts/python.exe" -m pip install --only-binary=:all: --index-url https://download.pytorch.org/whl/cu121 torch==2.5.1 torchvision==0.20.1
 "$VENV/Scripts/python.exe" -m pip install --only-binary=:all: numpy==1.26.4 pytest==8.3.4 PyYAML==6.0.2 timm==0.9.16 einops==0.8.0 scipy==1.14.1 opencv-python==4.9.0.80 scikit-learn==1.5.2 pandas==2.2.3 h5py==3.12.1 PyWavelets==1.8.0
 ```
 
-The listed direct packages are the complete focused-test set. Pip will also
-install their required transitive dependencies; actual versions must be recorded
-with `pip freeze` after installation.
+Environment creation succeeded. PyTorch installation initially failed as recorded
+below; after the separately approved pip upgrade, the unchanged PyTorch command
+and then the remaining focused-dependency command both completed with exit code
+0. The second command replaced initially resolved NumPy 2.4.6 with approved NumPy
+1.26.4. Pip installed the required transitive dependencies.
 
-### Exact post-install verification commands
+### Executed post-install verification commands
 
-After approval and installation, run from the repository root:
+These commands ran from the repository root:
 
 ```bash
 VENV="/c/Users/vaska/venvs/compwifi-piw3d-py311"
@@ -698,15 +830,69 @@ VENV="/c/Users/vaska/venvs/compwifi-piw3d-py311"
 PYTHONDONTWRITEBYTECODE=1 "$VENV/Scripts/python.exe" -m pytest tests/test_legacy_baseline.py -q -p no:cacheprovider
 ```
 
-Report every test individually. If any changed-code assertion fails, show the
-failure and propose the smallest fix before editing. Do not remove imports,
-weaken tests, use official `test_data`, preprocess the full dataset, or start
-training.
+Actual diagnostic output, excluding the freeze listing saved in the lockfile:
+
+```text
+Python 3.11.0
+pip 24.3.1 from C:\Users\vaska\venvs\compwifi-piw3d-py311\Lib\site-packages\pip (python 3.11)
+No broken requirements found.
+torch: 2.5.1+cu121
+CUDA build: 12.1
+CUDA available: True
+GPU: NVIDIA GeForce RTX 3080 Laptop GPU
+```
+
+`pip freeze` completed successfully. Its complete 43-distribution output is saved
+verbatim in `requirements/focused-test-py311-lock.txt`, the exact package set used
+by the successful suite above.
+
+### Approved setup attempt: actual outcome
+
+The exact environment-creation command completed successfully with exit code 0:
+
+```bash
+PY311="/c/Users/vaska/AppData/Local/Programs/Python/Python311/python.exe"
+VENV="/c/Users/vaska/venvs/compwifi-piw3d-py311"
+"$PY311" -m venv "$VENV"
+```
+
+The exact approved PyTorch installation command was attempted three times:
+
+```bash
+"$VENV/Scripts/python.exe" -m pip install --only-binary=:all: --index-url https://download.pytorch.org/whl/cu121 torch==2.5.1 torchvision==0.20.1
+```
+
+- First attempt: failed with exit code 2 after a network read timeout while
+  downloading `torch-2.5.1+cu121-cp311-cp311-win_amd64.whl` (about 0.3 of 2.4 GB
+  received). No package installation completed.
+- Second attempt: downloaded the 2.4 GB torch wheel and 6.1 MB torchvision wheel,
+  then failed with exit code 1. Pip 23.2.1 discarded every available
+  `typing_extensions>=4.8.0` candidate with `inconsistent Name: expected
+  'typing-extensions', but metadata has 'typing_extensions'`, ending with
+  `ERROR: No matching distribution found for typing-extensions>=4.8.0`.
+
+After separate user approval, the minimal unblock below succeeded with exit code
+0 and installed pip 24.3.1:
+
+```bash
+"$VENV/Scripts/python.exe" -m pip install pip==24.3.1
+```
+
+The unchanged PyTorch command then succeeded on its third attempt with exit code
+0, followed by the unchanged remaining focused-dependency command with exit code
+0. Post-install diagnostics and the full suite completed as recorded above, and
+`requirements/focused-test-py311-lock.txt` now contains the tested freeze output.
+
+No dataset content was downloaded, read, or preprocessed, and no training or
+evaluation was started. TensorBoard, `mat73`, and training-entry-point imports
+were deliberately not verified. The environment is not claimed training-ready.
 
 ## Legacy baseline repair checks
 
-The complete focused suite was attempted with the command above and produced
-`5 failed, 2 passed, 1 skipped`. The new accumulation test was also run alone:
+Before the dedicated environment was available, the complete focused suite in the
+old system interpreter produced `5 failed, 2 passed, 1 skipped` because of missing
+imports. The dedicated-environment rerun now produces `7 passed, 1 skipped` as
+itemized above. Earlier, the new accumulation test was also run alone:
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 python -m pytest tests/test_legacy_baseline.py::test_pose_gradient_accumulation_matches_effective_batch -q -p no:cacheprovider
@@ -723,8 +909,8 @@ python -c "from pathlib import Path; paths = ['model/model.py', 'feeder/person_i
 ```
 
 Actual result: `Syntax OK` for all six files. `git diff --check` completed with
-no output. No preprocessing, training entry point, evaluation, package
-installation, or environment creation was run.
+no output. Those earlier checks ran no preprocessing, training entry point, or
+evaluation; the later approved environment attempt is recorded separately above.
 
 ### Normalization numerical behavior
 
@@ -744,13 +930,28 @@ preserving the legacy single-device-batch path.
 
 ## Next recommended task
 
-Wait for approval of the exact installation commands above. After approval,
-install only that approved set, record actual Python/package versions, rerun the
-complete focused suite, and report each test individually. If all synthetic
-checks pass and training data is supplied, run only the conditional real
-training-sample check; do not begin Step 4 or full training automatically.
+First resolve pose units/joint ordering/coordinate conventions and validate the
+meaning of candidate sequence keys. Then, only with separate approval, generate
+the required processed arrays and rerun the real training-sample load test without
+using official `test_data` for training or model selection. Before any training,
+verify TensorBoard, `mat73`, both entry-point imports, and all required smoke
+checks. Keep Step 3 open until those checks pass; do not begin Step 4 or full
+training automatically.
 
 ## Progress log
+
+- 2026-11-05: Completed only the requested read-only real-data audit using the
+  dedicated Python 3.11 environment. Confirmed root
+  `data/person_in_wifi_3d/wifi_dataset`, 89,946 train and 7,824 test unique IDs,
+  complete listed raw CSI/keypoint pairing, and one-/two-/three-person coverage in
+  12 samples per split. Sampled raw CSI is `(20, 30, 3, 3)` compound float64 and
+  interpreted as `(3, 3, 30, 20)`; poses are float64 `(people, 14, 3)`. No sampled
+  NaN/Inf was found. Processed arrays are entirely absent, so normalization and
+  concatenation checks remain unmeasured. Documented 215/195 candidate sequence
+  groups, 2,032 train IDs without immediate successors, 195 train/test candidate
+  key overlaps, unknown pose conventions/metadata, YELLOW readiness, and exact
+  commands in both audit/status documents. No preprocessing, training, evaluation,
+  source change, or Step 4 work was performed.
 
 - 2026-11-03: Completed the read-only Phase 0 repository/environment
   inspection and updated this handoff. No experiments were run and no
@@ -775,3 +976,30 @@ training-sample check; do not begin Step 4 or full training automatically.
   3.11 environment commands without installing anything. Added and passed a
   synthetic effective-batch gradient-accumulation test while preserving the
   `steps_per_update=1` identity path.
+- 2026-11-04: Created the approved dedicated Python 3.11 virtual environment.
+  The first PyTorch wheel download timed out; the retry downloaded the wheels
+  but failed on pip 23.2.1's `typing-extensions`/`typing_extensions` metadata
+  name handling. Corrected the static `csi_ap` audit statement without claiming
+  real-data verification. No data access, preprocessing, training, evaluation,
+  TensorBoard import, or training-entry-point import was performed.
+- 2026-11-04: After separate approval, upgraded the dedicated environment to pip
+  24.3.1 and completed both unchanged approved dependency installations. Recorded
+  Python 3.11.0, torch 2.5.1+cu121, CUDA 12.1 availability, and the RTX 3080 Laptop
+  GPU; `pip check` passed. The full suite produced 7 passed, 1 skipped, and one
+  external deprecation warning, with no import failures or assertion repairs.
+  Saved `requirements/focused-test-py311-lock.txt`. Step 3 remains open for the
+  unavailable real-data test; Step 4 and training were not begun.
+- 2026-11-04/05: Downloaded the full public Wiception3D dataset from the approved
+  Kaggle URL (public, authentication-free; no packages installed; existing curl
+  and standard-library Python only). A single-stream curl download died on a
+  connection reset and its retry throttled, and a bash 10-chunk downloader
+  stopped on Git Bash fork failures, so the download was completed with a
+  stdlib-Python threaded resumable-chunk downloader. Archive
+  `data/_downloads/wiception3d_archive.zip` verified at exactly 16,809,368,215
+  bytes; zip central directory valid (293,312 entries). Extracted without
+  overwrites into `data/person_in_wifi_3d/`: 293,312 files, 0 skipped, 18.69 GB;
+  actual PIW3D_DATA_ROOT is `data/person_in_wifi_3d/wifi_dataset` containing
+  `train_data` (csi/keypoint/smpl, 89,946 each + list) and `test_data`
+  (csi/keypoint/smpl, 7,824 each + list). `process.py` untouched and tracked;
+  `.gitignore` gained `data/_downloads`; `git check-ignore` verified. No
+  preprocessing, audit, training, or evaluation was started.
