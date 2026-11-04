@@ -110,13 +110,19 @@ class PersonInWif3D(Dataset):
             data_info.append(data_dict)
         return data_info
 
+    @staticmethod
+    def _min_max_normalize(data):
+        minimum = np.min(data)
+        maximum = np.max(data)
+        if maximum == minimum:
+            return np.zeros_like(data)
+        return (data - minimum) / (maximum - minimum)
+
     def read_frame(self, csi_path):
         data = np.load(csi_path)
         # data = (data - np.min(data)) / (np.max(data) - np.min(data))
-        amplitude_data = data[:,:90,:]
-        phase_data = data[:,90:,:]
-        amplitude_data = (amplitude_data - np.min(amplitude_data)) / (np.max(amplitude_data) - np.min(amplitude_data))
-        phase_data = (phase_data - np.min(phase_data)) / (np.max(phase_data) - np.min(phase_data))
+        amplitude_data = self._min_max_normalize(data[:,:90,:])
+        phase_data = self._min_max_normalize(data[:,90:,:])
         data = np.concatenate((amplitude_data, phase_data), axis=1)
         return data
 
@@ -182,7 +188,7 @@ def collate_fn_padd(batch):
 
     return batch_data
 
-def piw3_make_dataloader(dataset, is_training, generator, batch_size, collate_fn_padd = collate_fn_padd):
+def piw3_make_dataloader(dataset, is_training, generator, batch_size, collate_fn_padd = collate_fn_padd, num_workers=8):
     loader = DataLoader(
         dataset,
         batch_size=batch_size,
@@ -190,6 +196,6 @@ def piw3_make_dataloader(dataset, is_training, generator, batch_size, collate_fn
         shuffle=is_training,
         drop_last=is_training,
         generator=generator,
-        num_workers=8
+        num_workers=num_workers
     )
     return loader

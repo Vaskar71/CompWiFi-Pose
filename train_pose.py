@@ -200,6 +200,7 @@ if __name__ == '__main__':
         attention_list_first = []
         attention_list_second = []
         for batch_idx, batch_data in enumerate(train_loader):
+            step_count += 1
             # Please check the data structure here.
             csi_data = batch_data['input_wifi-csi'].to(device)
             n, _, _, _ = csi_data.size()

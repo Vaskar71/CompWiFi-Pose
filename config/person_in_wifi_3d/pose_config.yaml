@@ -18,5 +18,5 @@ setting: one-person
 num_person: 1
 experiment_name: DT-Pose
 training_semi: False
-pretrained_model_path: pretrain_weights/person-in-wifi-3d/pretrain_our_ratio80.pt
+pretrained_model_path: pretrain_weights/person-in-wifi-3d/all-person/pretrain_our_ratio80.pt
 save_path: pose_weights
