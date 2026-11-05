@@ -60,16 +60,44 @@ complete focused suite produced **7 passed, 1 skipped** with no import-related
 failures. The exact tested package set is saved in
 `requirements/focused-test-py311-lock.txt`.
 
-The Phase 1 read-only structural and bounded-content audit is complete with a
-YELLOW readiness assessment. Phase 1 is not fully exited because correct pose
-visualization/conventions have not been validated. Step 3 baseline smoke
-verification remains open: raw training data is now present, but feeder-required
-`csi_ap` is absent and the conditional real-sample preprocessing/load test was
-not rerun. No pretrained checkpoint is present. No baseline training, dataset
-preprocessing, evaluation, or experiment was started. This is a focused-test
-environment only, not a training-readiness claim: TensorBoard, `mat73`, and the
-training-entry-point imports have not been separately verified. Do not begin
-Step 4.
+The Phase 1 read-only structural, bounded-content, pose, split, and metric audits
+are complete with a **YELLOW** readiness assessment. The latest audit parsed all
+official list filenames, checked 90 official training poses (30 per person-count
+category), generated and visually inspected six skeleton figures, and inspected
+metric source without editing it. All 90 shape/count/finiteness/nonconstant checks
+passed. Axis 2 appears vertical and stored units are plausibly metres, but official
+units, joint ordering, coordinate frame, and candidate temporal group semantics
+remain unproven. Observed train/test frame ranges are 10..599 and 301..349; these
+reject the literal 1-based first-550/last-50 interpretation. There are 215 train
+and 195 test candidate temporal groups, with all 195 test groups shared with train
+and zero exact listed-ID overlap. MPJPE/PA-MPJPE retain stored units; PiW3D PCK
+uses joints 6 and 4 (the elbows under the provisional ordering); ground-truth-count
+trimming and slot-wise pairing hide count/miss/duplicate behavior. Full evidence is
+in `docs/POSE_SPLIT_METRIC_AUDIT.md`.
+
+Step 3 baseline smoke verification remains open: raw training data is present, but
+feeder-required `csi_ap` is absent and the conditional real-sample
+preprocessing/load test was not rerun. No pretrained checkpoint is present. No
+baseline training, dataset preprocessing, evaluation, or experiment was started.
+This is a focused-test environment only, not a training-readiness claim:
+TensorBoard, `mat73`, and the training-entry-point imports have not been separately
+verified. Do not begin Step 4.
+
+### Latest audit command and outputs
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 /c/Users/vaska/venvs/compwifi-piw3d-py311/Scripts/python.exe audit_piw3d_pose_and_split.py --data_root data/person_in_wifi_3d/wifi_dataset --output docs/POSE_SPLIT_METRIC_AUDIT.md --figure_dir docs/figures/pose_audit
+```
+
+The command exited successfully and printed YELLOW, the verified/unresolved facts,
+rating reasons, and generated files. Syntax compilation and `--help` also completed
+successfully before execution. The legacy pytest suite was deliberately not run
+because this read-only task prohibits its synthetic optimization/training behavior.
+
+Generated/changed by this audit: `audit_piw3d_pose_and_split.py`,
+`docs/POSE_SPLIT_METRIC_AUDIT.md`, six PNGs under `docs/figures/pose_audit/`, and
+this handoff. No preprocessing/training/test-array access, package installation,
+metric/source change, dataset write, commit, or push occurred.
 
 ## Completed work
 
@@ -459,9 +487,11 @@ written; no dataset file was created, modified, or preprocessed.
   candidate keys overlap train keys, while exact listed-ID overlap is zero.
   Filename-grouped train/development splitting is provisionally possible, but no
   recording-, subject-, or environment-disjoint claim is supported yet.
-- Pose units, joint ordering, coordinate axes/origin/frame, and candidate sequence
-  semantics remain unknown. The audit found no metadata establishing them and did
-  not perform visualization. Overall readiness is YELLOW; see `docs/DATA_AUDIT.md`.
+- Pose units, joint ordering, coordinate axes/origin/frame, and candidate temporal
+  group semantics remain unproven. A separate audit validated 90 training-pose
+  structures and generated/inspected six skeleton figures; axis 2 appears vertical
+  and metre scale is plausible from body proportions. Overall readiness is YELLOW;
+  see `docs/DATA_AUDIT.md` and `docs/POSE_SPLIT_METRIC_AUDIT.md`.
 
 ## Newly discovered environment facts
 
@@ -536,8 +566,9 @@ written; no dataset file was created, modified, or preprocessed.
 - Processed amplitude/phase/`csi_ap` shapes, ranges, constant-case frequency,
   concatenation equality, and compatibility with the real feeder.
 - Full-dataset file readability and NaN/Inf status beyond the bounded samples.
-- Pose units, joint ordering, coordinate conventions, and validated visualization.
-- Recording, subject, and environment semantics of filename-derived sequence keys.
+- Official pose units, joint ordering, and coordinate conventions; visualization
+  has been generated and inspected, but it does not prove those conventions.
+- Recording, subject, environment, and clip semantics of candidate temporal groups.
 - Whether the dedicated environment can run all entry points and whether further
   runtime blockers remain once dependencies are available.
 - Baseline reproduction accuracy and zero-label compositional viability.
@@ -748,13 +779,13 @@ This confirms only the current interpreter. No tests were available or run.
 
 ## Immediate task
 
-The requested read-only real-data audit is complete. The actual root, CLI,
-representative one-/two-/three-person samples, full-list pairing, bounded array
-contents, sequence structure, and readiness are documented in
-`docs/DATA_AUDIT.md`; the dataset is YELLOW overall. Stop after the audit as
-requested. Do not preprocess, train, evaluate, or begin Step 4 automatically.
-Before any later training, separately approve and verify the remaining entry-point
-dependencies and imports, including TensorBoard and `mat73`.
+The requested read-only pose, metric, and filename-semantics audit is complete with
+a YELLOW rating. Results, commands, limitations, and six inspected visualizations
+are documented in `docs/POSE_SPLIT_METRIC_AUDIT.md`; the earlier data audit remains
+in `docs/DATA_AUDIT.md`. Stop after the audit as requested. Do not preprocess,
+train, evaluate, or begin Step 4 automatically. Before any later training,
+separately approve and verify the remaining entry-point dependencies and imports,
+including TensorBoard and `mat73`.
 
 ## Focused-test inspection
 
@@ -930,15 +961,29 @@ preserving the legacy single-device-batch path.
 
 ## Next recommended task
 
-First resolve pose units/joint ordering/coordinate conventions and validate the
-meaning of candidate sequence keys. Then, only with separate approval, generate
-the required processed arrays and rerun the real training-sample load test without
-using official `test_data` for training or model selection. Before any training,
-verify TensorBoard, `mat73`, both entry-point imports, and all required smoke
-checks. Keep Step 3 open until those checks pass; do not begin Step 4 or full
-training automatically.
+First resolve official pose units/joint ordering/coordinate conventions and the
+meaning of candidate temporal groups; the observed indices require checking the
+actual split-selection convention rather than assuming first-550/last-50. Then,
+only with separate approval, generate the required processed arrays and rerun the
+real training-sample load test without using official `test_data` for training or
+model selection. Before any training, verify TensorBoard, `mat73`, both entry-point
+imports, and all required smoke checks. Keep Step 3 open until those checks pass;
+do not begin Step 4 or full training automatically.
 
 ## Progress log
+
+- 2026-11-05: Completed the read-only pose/split/metric audit. Parsed all 89,946
+  train and 7,824 test list IDs without reading test arrays; validated 90 official
+  training poses; measured coordinates and major-limb lengths; generated and
+  inspected six equal-scale skeleton figures. Axis 2 appears vertical and metre
+  scale is plausible, but official conventions remain unproven. Train/test frame
+  ranges are 10..599/301..349, rejecting a literal first-550/last-50 interpretation;
+  all 195 test candidate temporal groups overlap train. Confirmed stored-unit
+  MPJPE/PA-MPJPE, inter-elbow PCK normalization under the provisional ordering, and
+  count-trimming/slot-pairing evaluation limitations. Rating is YELLOW. Added
+  `audit_piw3d_pose_and_split.py`, `docs/POSE_SPLIT_METRIC_AUDIT.md`, and six PNGs;
+  updated this handoff. No preprocessing, training, evaluation, metric change,
+  dataset modification, commit, or push occurred.
 
 - 2026-11-05: Completed only the requested read-only real-data audit using the
   dedicated Python 3.11 environment. Confirmed root
