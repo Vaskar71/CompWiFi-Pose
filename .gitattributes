@@ -1,0 +1,7 @@
+# Step-4B-D4 and Step-4B-R record SHA-256 hashes of these three documents as
+# they existed with CRLF line endings in the original Windows working copy
+# (git normalises the stored blobs to LF). Check them out with CRLF so those
+# protected-record hashes verify on every checkout. Other files are unaffected.
+docs/DATA_AUDIT.md text eol=crlf
+docs/POSE_SPLIT_METRIC_AUDIT.md text eol=crlf
+docs/PROJECT_CONTEXT.md text eol=crlf
