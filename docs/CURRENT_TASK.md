@@ -1,5 +1,34 @@
 # Current Task and Project Status
 
+## Status at a glance (updated 2026-11-10, end of Phase A)
+
+- **Phase:** Phase A of `docs/NEXT_PHASE_PLAN.md` (consolidate and secure the repository) is complete.
+  Plan: Phase A (done) -> Phase B "Step 5" (single-person baseline that provably learns) -> Phase C
+  "Step 6" (minimal compositional pilot, arms A/B/C). Binding rules: `AGENTS.md`,
+  `docs/PROJECT_CONTEXT.md`, `docs/RESEARCH_PROTOCOL.md`, and the plan itself.
+- **Last scientific verdict:** Step-4B-R = `BASELINE_COMPLETE` (completion status, not an accuracy pass).
+  From-scratch DT-Pose encoder + legacy pose decoder, 10 epochs, AdamW lr 1e-3, batch 8. It did **not**
+  beat the constant train-mean pose: train/dev MPJPE 1.0592/0.8333 vs mean-pose 0.9898/0.8014 (stored
+  units; development = 4 candidate-filename groups disjoint from the 8 training groups). Original
+  Step-4B stays `BLOCKED`; D1-D4 are closed.
+- **Collapse diagnosis (Phase A, reproduced, `docs/STEP_4B_R_COLLAPSE_DIAGNOSIS.md`):** all 512 dev
+  predictions are one identical 3D point (std across samples 6.6e-07); the legacy pose decoder's three
+  post-norm transformer layers are dead (activation std across samples 4.2e-04 -> 5.4e-06 -> 4.7e-07)
+  while the encoder feature (0.196) and `gconv3` (0.476) are alive; the target is dominated by position
+  (centroid-relative mean-skeleton MPJPE only 0.155 train / 0.128 dev vs 0.990 / 0.801 absolute); the pilot
+  has only 8 training positions. All numbers in the plan's premises reproduced.
+- **Repository:** branch `consolidate/step3-to-step4b-r` holds all work since `c494564` (Step 3 gate ->
+  Step-4B-R + diagnosis), committed locally in logical commits. **Nothing is pushed**; `main` is
+  unchanged; stash `9585ba9375a2218a9d3af5ae52c6c640cb247d32` is retained (not dropped).
+- **Tests:** `PIW3D_DATA_ROOT=data/_fixtures/piw3d_two_frame ... pytest tests` -> **92 passed, 0 skipped**
+  (74 baseline + 18 new collapse-diagnosis tests). Before the line-ending fix recorded below the same
+  suite gave 73 passed, 1 failed.
+- **Open user decisions (plan step 9):** (a) push the branch to `kimi`? (b) fast-forward `main`?
+  (c) drop the stash now that its content is committed? None done.
+- **Next task:** Phase B ("Step 5", `docs/NEXT_PHASE_PLAN.md` section 4) in a fresh session, working in the
+  main checkout (data/artifacts exist only there). Do not start Phase B or C without the user's go-ahead.
+- Detailed history below is unchanged; the Phase A entry is at the top of the progress log.
+
 ## Dataset acquisition and audit status (2026-11-05)
 
 The public Wiception3D / Person-in-WiFi-3D dataset has been downloaded,
@@ -34,10 +63,11 @@ pairing checks, and bounded real-array inspection are complete.
   float64 real/imag fields; audit interpretation gives `(3, 3, 30, 20)`. All 24
   sampled poses are float64 `(people, 14, 3)`. No sampled raw CSI or pose array
   contains NaN/Inf. These are bounded content checks, not a full-dataset scan.
-- `csi_ap`, `csi_amplitude`, and `csi_phase` are absent for every listed ID in
-  both splits. The existing feeder therefore cannot yet consume the extracted
-  data. Constant normalization cases and equality between `csi_ap` and
-  concatenated amplitude/phase are unmeasured; no preprocessing was run.
+- At audit time, `csi_ap`, `csi_amplitude`, and `csi_phase` were absent for every
+  listed ID in both splits. Official full-dataset processed arrays remain absent.
+  The later bounded Step-3 fixture verified finite shapes and exact amplitude/phase
+  concatenation for two official training IDs only; it did not measure full-dataset
+  constant-case frequency, ranges, or integrity.
 - Sequence analysis found 215 train and 195 test candidate keys, with 195 keys
   shared across the official split and 0 exact listed-ID overlap. Grouped
   train/development splitting is provisionally possible by filename key, but
@@ -65,23 +95,103 @@ are complete with a **YELLOW** readiness assessment. The latest audit parsed all
 official list filenames, checked 90 official training poses (30 per person-count
 category), generated and visually inspected six skeleton figures, and inspected
 metric source without editing it. All 90 shape/count/finiteness/nonconstant checks
-passed. Axis 2 appears vertical and stored units are plausibly metres, but official
-units, joint ordering, coordinate frame, and candidate temporal group semantics
-remain unproven. Observed train/test frame ranges are 10..599 and 301..349; these
-reject the literal 1-based first-550/last-50 interpretation. There are 215 train
-and 195 test candidate temporal groups, with all 195 test groups shared with train
-and zero exact listed-ID overlap. MPJPE/PA-MPJPE retain stored units; PiW3D PCK
-uses joints 6 and 4 (the elbows under the provisional ordering); ground-truth-count
-trimming and slot-wise pairing hide count/miss/duplicate behavior. Full evidence is
-in `docs/POSE_SPLIT_METRIC_AUDIT.md`.
+passed. The local audit interprets axis 2 as vertical and stored units as plausibly
+metres, but the original authors' per-axis evaluation instead treats axis 1 as
+vertical. This conflict is unresolved; coordinates have not been reordered and
+neither interpretation is declared official. Official units, joint ordering,
+coordinate frame, and candidate temporal group semantics remain unproven. The paper
+documents a first-550/last-50 protocol, but released IDs do not verify its literal
+filename mapping: observed train/test frame ranges are 10..599 and 301..349, with
+no test IDs in 551..600. There are 215 train and 195 test candidate temporal groups,
+with all 195 test groups shared with train and zero exact listed-ID overlap. The
+original authors' evaluation supports metre-to-millimetre conversion, while local
+legacy MPJPE/PA-MPJPE retain stored units and omit `*1000`; PiW3D PCK uses joints 6
+and 4 (the elbows under the provisional ordering); ground-truth-count trimming and
+slot-wise pairing hide count/miss/duplicate behavior. Full evidence and the shared
+corrections are in `docs/POSE_SPLIT_METRIC_AUDIT.md`.
 
-Step 3 baseline smoke verification remains open: raw training data is present, but
-feeder-required `csi_ap` is absent and the conditional real-sample
-preprocessing/load test was not rerun. No pretrained checkpoint is present. No
-baseline training, dataset preprocessing, evaluation, or experiment was started.
-This is a focused-test environment only, not a training-readiness claim:
-TensorBoard, `mat73`, and the training-entry-point imports have not been separately
-verified. Do not begin Step 4.
+The bounded Step-3 gate is **GREEN for the specified engineering checks and
+protocol documentation only** (2026-11-06). A deterministic ignored fixture now
+contains only official training IDs `S11_01_10` and `S11_01_11`. Both processed
+samples have finite amplitude `(3,90,20)`, phase `(3,90,20)`, and `csi_ap`
+`(3,180,20)`, with exact amplitude/phase concatenation. The Step-3 focused suite
+reported **8 passed, 0 skipped** (one external `timm` deprecation warning). A
+separate from-scratch training-only smoke completed exactly one forward, backward,
+and SGD step on CUDA with `num_workers=0`: loss `3.750966311`, 47 finite
+nonzero-gradient tensors, and 47 changed nonzero-gradient parameters (first:
+`pose_prompt`). No Step-3 validation/test loader, evaluation, checkpoint
+selection, full preprocessing, full training, or pilot was run.
+
+Step-4A is **complete for label-safe data infrastructure and corrected research
+metrics only** (2026-11-06). A bounded upstream source check found code-level
+support for `*1000` millimetre reporting and axis-1 vertical evaluation, but no
+filename-group semantics; unit, axis, and group uncertainties remain recorded
+rather than silently resolved. Deterministic ignored manifests were generated from
+the official training list only: 215 candidate groups split into 172 internal-train
+groups/70,197 IDs and 43 internal-development groups/19,749 IDs, with zero ID
+overlap, zero group overlap, and zero immediate-next-frame crossings. A separate
+unlabelled CSI loader returns only `csi` tensors, never keypoints, poses,
+`person_num`, raw IDs, or filename-count-derived signals. Corrected research
+metrics are implemented in a new module with Hungarian matching, matched
+MPJPE/PA-MPJPE in millimetres, guarded PCK, exact count accuracy, missed and
+duplicate/spurious counts, person precision/recall/F1, root error, and
+denominator-weighted global aggregation. The complete focused suite now reports
+**33 passed, 0 skipped** with the same external `timm` deprecation warning.
+Scientific feasibility, accuracy, novelty, and scientific readiness remain
+**unproven**. Official full-dataset processed arrays remain absent, no pretrained
+checkpoint is present, TensorBoard, `mat73`, and training-entry-point imports
+remain separately unverified, and the corrected evaluator is not wired into
+training. Full evidence and exact commands are in `docs/STEP_4A_REPORT.md`.
+
+Step-4B is **BLOCKED at the frozen overfit gate** (2026-11-07). The corrected seed-0 freeze selected 8 internal-train groups/2,048 IDs and 4 internal-development groups/512 IDs (2,560 total), using only filename-marked one-person official-training IDs from the existing internal manifests. Bounded `process_ids` preprocessing into `data/_artifacts/step4b_pilot/pilot_data_v2/` validated all 2,560 samples with zero failures: finite `(3,90,20)` amplitude/phase, exact `(3,180,20)` amplitude/phase concatenation, finite `(1,14,3)` keypoints, and correct internal split assignment. The separate Q=1 research loader/entry point was implemented without running `train_pose.py` or touching official test data. The frozen one-batch overfit check on CUDA completed 200 finite SGD steps and reduced stored-unit MPJPE from `4.920130252838135` to `0.34014594554901123` (ratio `0.06913352453480291`), but failed the predeclared absolute criterion `<=0.10`; decision `BLOCKED` is recorded in `data/_artifacts/step4b_pilot/decision.json` and `docs/STEP_4B_REPORT.md`. No epoch run, development evaluation, mean-pose comparison, compositional training, package change, download, deletion, commit, push, or remote change occurred after the failure. The complete focused suite with the existing two-frame fixture now reports **48 passed, 0 skipped**, with the same external `timm` deprecation warning. Scientific feasibility remains unproven.
+
+Step-4B-D1 is **complete as a disclosed extended-step diagnostic** (2026-11-07). The verifier confirmed the corrected `freeze_v2`/`pilot_data_v2` internal-training artifacts, exact CSI/keypoint pairing for the fixed eight-sample batch, seed `0`, SGD(`lr=0.01`, `momentum=0.9`), 200 original steps, unchanged coordinates, and the original `BLOCKED` decision. The separate D1 freeze changed only the optimizer budget to `800` steps. On CUDA, all losses and gradients remained finite; initial and step-200 MPJPE exactly matched the original values (`4.920130252838135` and `0.34014594554901123` stored units), but final step-800 train-mode MPJPE remained `0.32848620414733887`, above the unchanged `<=0.10` criterion. The trajectory plateaued around `0.33–0.34`; predictions did not collapse toward the fixed-batch or frozen-train mean; residual error concentrated in coordinate index 2 and joint indices 8, 11, 9, 1, and 10. Original Step-4B remains **BLOCKED**. Full measurements and plots are in `docs/STEP_4B_D1_REPORT.md` and `data/_artifacts/step4b_d1/`; no development samples, official test data, epoch training, package change, download, deletion, commit, push, or remote change occurred.
+
+Step-4B-D2 is **complete as a disclosed encoder-trainability diagnostic** (2026-11-07). Before editing, a named-parameter audit directly confirmed the original runtime configuration: all 50 encoder parameters (`3,390,464` values) were frozen, all 47 pose-decoder parameters (`1,404,931` values) were trainable, and SGD covered exactly those 47 parameters. The minimal opt-in `train_encoder` mechanism preserved default legacy behavior. The frozen D2 protocol changed only encoder trainability from frozen to trainable while preserving the corrected tiny batch, seed `0`, initialization values, 200 SGD(`lr=0.01`, `momentum=0.9`) steps, loss, data, preprocessing, and `<=0.10` stored-unit criterion. CUDA training completed with finite losses/gradients; all 97 intended parameters were optimized exactly once, all 50 encoder gradients were nonzero every step, and all 50 encoder parameters changed. Final train-mode MPJPE was `0.46943652629852295`, above criterion and `0.12929058074951172` worse than the original frozen-encoder endpoint. Original Step-4B remains **BLOCKED**; D1 remains above criterion. Full measurements are in `docs/STEP_4B_D2_REPORT.md` and `data/_artifacts/step4b_d2/`; no development samples, official test data, epoch training, package change, download, deletion, commit, push, or remote change occurred.
+
+Step-4B-D3 is **stopped at its frozen D2 reproduction gate** (2026-11-07). The separate protocol, D3-only runner, and five focused tests were added before training; the focused file passed `5 passed, 1 warning`, and the complete fixture-backed suite passed **62 passed, 0 skipped**, with the same external `timm` warning. The pre-run verifier confirmed the protected original Step-4B, D1, and D2 records and wrote `data/_artifacts/step4b_d3/step4b_d3_freeze.json` before model construction. The fresh seed-0 trainable-encoder run reproduced the D2 initial train-mode MPJPE exactly, but produced step-100 MPJPE `0.40826788544654846` instead of recorded D2 `0.5151628255844116`, and step-200 MPJPE `0.3430270552635193` instead of recorded D2 `0.46943652629852295`. Per the frozen stop rule, D3 exited with `D2_REPRODUCTION_MISMATCH_STOPPED` before extending past step 200. Consequently there is no valid step-800 MPJPE, final/initial ratio, late-trajectory summary, D3 criterion status, checkpoint/prediction trajectory, final state-dict, result JSON, or decision JSON. Original Step-4B remains **BLOCKED**; D1/D2 remain above-criterion diagnostics. Full evidence is in `docs/STEP_4B_D3_PROTOCOL.md`, `docs/STEP_4B_D3_REPORT.md`, and `data/_artifacts/step4b_d3/`; no development samples, official test data, epoch training, package change, download, deletion, commit, push, remote change, rerun, or automatic fix attempt occurred.
+
+Step-4B-D4 is **complete as a bounded reproducibility audit** (2026-11-08). Before new runs, the static comparison found that D3 aliases the D2 model/optimizer builders and shares the seed, ordered eight-sample loader, forward/backward/loss sequence, SGD update, parameter audits, and step-0/100/200 train-mode checkpoint procedure; observed D3 differences were wrapper verification/bookkeeping, the 800-step budget, duplicate gradient-statistics bookkeeping, and the post-step-200 reproduction gate. The environment record captured Python `3.11.0`, PyTorch `2.5.1+cu121`, CUDA `12.1`, RTX 3080 Laptop GPU, seed `0`, and deterministic algorithms/cuDNN/cuBLAS-related settings without enabling deterministic mode. Two independent unchanged seed-0 200-step D2 repeats completed under `data/_artifacts/step4b_d4/repeat_a/` and `repeat_b/`: both exactly reproduced D2's initial MPJPE `4.920130252838135`, had finite losses/gradients, exact 97-parameter optimizer coverage, and 97/97 trainable plus 50/50 encoder parameter changes. Repeat A measured step-100 MPJPE `0.4460887312889099` and step-200 `0.46392330527305603`; repeat B measured `0.49196043610572815` and `0.37702471017837524`. Exact comparisons classify the evidence as **`repeats differ from each other`**; the first A/B full-record divergence is step 1 in `max_abs_encoder_gradient`, and the first A/B pre-update-loss divergence is step 3. The D4 focused file passed `6 passed, 1 warning`, and the complete fixture-backed suite passed **68 passed, 0 skipped**, with the same external `timm` warning. All 40 pre-selected protected historical records remained unchanged before and after D4. Full evidence is in `docs/STEP_4B_D4_REPORT.md` and `data/_artifacts/step4b_d4/`; no D3 rerun, 800-step extension, deterministic-setting change, optimizer/criterion/data change, development/test access, epoch training, package change, download, deletion, commit, push, remote change, or automatic fix attempt occurred.
+
+Step-4B-R is **complete as a deterministic single-person baseline, verdict `BASELINE_COMPLETE`** (2026-11-08; recorded here during Phase A, numbers from `docs/STEP_4B_R_REPORT.md` and `data/_artifacts/step4b_r/baseline/`). It is a separately named baseline, not a rerun or reversal of Step-4B/D1-D4. Data: 2,048 single-person internal-train IDs (8 candidate groups) and 512 internal-development IDs (4 groups, zero ID/group overlap); official test, multi-person samples, unlabelled data, and pretrained checkpoints unused. Model: from-scratch `MAE_ViT` encoder (trainable) + legacy `ViT_Pose_Decoder`, stored `(1,14,3)` targets, AdamW lr `0.001`, weight decay `0.0`, batch 8, 10 epochs, final-epoch checkpoint only, deterministic execution enabled (`PYTHONHASHSEED=0`, `CUBLAS_WORKSPACE_CONFIG=:4096:8`). Result in stored units: final model train/development MPJPE `1.0592086446704343`/`0.8333281083032489` versus training-derived constant mean pose `0.989848210435728`/`0.8013955073852118`; the model did **not** beat the mean predictor on either partition. The report records a focused file of `6 passed` and the fixture-backed suite at `74 passed` before the run. No accuracy, generalization, or feasibility claim follows.
+
+Step-4B-R collapse diagnosis is **complete (Phase A, 2026-11-10)** and reproduced every premise of `docs/NEXT_PHASE_PLAN.md` section 1 (`diagnose_step4b_r_collapse.py`, read-only on artifacts, CPU; report `docs/STEP_4B_R_COLLAPSE_DIAGNOSIS.md`, data `data/_artifacts/step4b_r_diagnosis/diagnosis.json`). (1) The 512 stored development predictions are a single common point `[2.7970, 1.7842, 3.2779]` (max deviation `4.3e-06`, std across samples `6.6e-07`; ground-truth std across samples `0.3186`). (2) In eval mode on 16 train + 16 development samples, std across samples is `0.1959` at the pooled encoder feature and `0.4761` after `gconv3` (std across joints `3.1694`), but `4.240e-04` after `transformer_encoder1`, `5.362e-06` after `transformer_encoder2`, and `4.746e-07` after `transformer_encoder3`: the collapse is inside the legacy decoder's post-norm transformer layers. The activation checks are pattern checks within 3x (the plan quotes about 1-2 significant figures and no std convention); the target and prediction checks are exact-to-rounding. (3) Target decomposition from train labels only: absolute mean-pose MPJPE `0.9898`/`0.8014`, centroid distance to the train-mean centroid `0.9683`/`0.7874`, centroid-relative mean-skeleton MPJPE `0.1549`/`0.1279` (train/development, stored units, 14-joint centroid as translation reference). (4) The pilot contains exactly 8 training and 4 development candidate groups, each essentially one position (per-axis within-group centroid std 0.007-0.117 train, 0.008-0.031 development). These are descriptive measurements of one run; they do not prove the cause of the collapse beyond what the activation trace shows.
+
+### Step-3 bounded gate commands and outputs
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 /c/Users/vaska/venvs/compwifi-piw3d-py311/Scripts/python.exe -m pytest tests/test_piw3d_preprocessing.py -q -p no:cacheprovider
+```
+
+Result: `2 passed in 3.10s`. Before implementation, both tests failed with the
+expected `ImportError` for missing `process_id`/`process_ids`.
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 /c/Users/vaska/venvs/compwifi-piw3d-py311/Scripts/python.exe make_piw3d_smoke_fixture.py --source-root data/person_in_wifi_3d/wifi_dataset --output-root data/_fixtures/piw3d_two_frame
+```
+
+The final run selected `S11_01_10, S11_01_11`, processed only those two files, and
+printed the required shapes, `finite=True`, and `exact_concatenation=True` for
+both. The first attempt stopped before processing with
+`FileNotFoundError: ... data\_fixtures\piw3d_two_frame\train_data\csi\S11_01_10.mat`;
+copying the same two official raw training files into the ignored fixture resolved
+that tooling error. No original dataset file was modified.
+
+```bash
+PIW3D_DATA_ROOT=data/_fixtures/piw3d_two_frame PYTHONDONTWRITEBYTECODE=1 /c/Users/vaska/venvs/compwifi-piw3d-py311/Scripts/python.exe -m pytest tests/test_legacy_baseline.py -q -p no:cacheprovider
+```
+
+Result: `8 passed, 1 warning in 20.27s`; no tests were skipped, weakened, or added
+to this eight-test focused file.
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 /c/Users/vaska/venvs/compwifi-piw3d-py311/Scripts/python.exe smoke_piw3d_training.py --data-root data/_fixtures/piw3d_two_frame
+```
+
+Result: one eligible training sample; IDs `S11_01_10, S11_01_11`; device `cuda`;
+one forward/backward/optimizer step; finite loss `3.750966311`; 47 finite and 47
+nonzero-gradient tensors; 47 changed nonzero-gradient parameters, first
+`pose_prompt`. The model was created from scratch and no checkpoint was loaded.
 
 ### Latest audit command and outputs
 
@@ -158,6 +268,10 @@ metric/source change, dataset write, commit, or push occurred.
   and reran the complete suite: 7 passed and 1 skipped, with no import failures.
 - Saved the exact successfully tested package set as
   `requirements/focused-test-py311-lock.txt`.
+- Completed the bounded Step-3 documentation corrections, two-frame real-training
+  fixture, focused acceptance run, one-step training-only smoke, and design-only
+  research protocol. The bounded engineering/protocol gate is GREEN; scientific
+  readiness remains unproven and no pilot or full research model was started.
 
 ## Files changed
 
@@ -165,7 +279,7 @@ metric/source change, dataset write, commit, or push occurred.
 - Environment proposal and earlier status handoff: `docs/CURRENT_TASK.md` only.
 - Dataset audit tooling: added `audit_person_in_wifi_3d.py` and
   `docs/DATA_AUDIT.md`; updated `docs/CURRENT_TASK.md`.
-- Real-data audit (this task): updated `docs/DATA_AUDIT.md` and
+- Real-data audit: updated `docs/DATA_AUDIT.md` and
   `docs/CURRENT_TASK.md` only. No source, test, or dataset file was changed.
 - Legacy baseline repair: changed `model/model.py`, `train_pose.py`, `utils.py`,
   `config/person_in_wifi_3d/pose_config.yaml`,
@@ -174,6 +288,42 @@ metric/source change, dataset write, commit, or push occurred.
 - Focused-test setup: added `requirements/focused-test-py311-lock.txt`; updated
   `docs/CURRENT_TASK.md` and the static `csi_ap` statement in
   `docs/DATA_AUDIT.md`. No source or test changes were needed after installation.
+- Bounded Step-3 gate: added `data/_fixtures/` to `.gitignore`; refactored
+  `data/person_in_wifi_3d/process.py`; added `make_piw3d_smoke_fixture.py`,
+  `smoke_piw3d_training.py`, and `tests/test_piw3d_preprocessing.py`; added
+  `docs/RESEARCH_PROTOCOL.md` and `docs/STEP_3_GATE_GOAL.md`; updated
+  `docs/PROJECT_CONTEXT.md`, `docs/POSE_SPLIT_METRIC_AUDIT.md`, and this handoff.
+  The generated fixture is ignored and is not a source change.
+- Step-4A infrastructure: added `piw3d_manifest.py`,
+  `feeder/piw3d_unlabelled.py`, `research_metrics.py`, and 23 new tests across
+  `tests/test_piw3d_manifest.py`, `tests/test_piw3d_unlabelled_loader.py`, and
+  `tests/test_research_metrics.py`; added the `data/_artifacts/` ignore rule and
+  generated ignored candidate-group manifests under
+  `data/_artifacts/piw3d_candidate_group_manifests/`; added
+  `docs/STEP_4A_GOAL.md` and `docs/STEP_4A_REPORT.md`; updated this handoff.
+  Legacy `utils.py` and `feeder/person_in_wifi_3d.py` were not changed.
+- Step-4B-D1 diagnostic: added `step4b_d1_diagnostic.py`,
+  `tests/test_step4b_d1_diagnostic.py`, and `docs/STEP_4B_D1_REPORT.md`; updated
+  this handoff. Generated ignored evidence under `data/_artifacts/step4b_d1/`.
+  Original `step4b_config.py`, the Step-4B entry point, and the original
+  `data/_artifacts/step4b_pilot/decision.json` were not changed.
+- Step-4B-D2 diagnostic: changed `model/model.py` only to add the opt-in
+  `train_encoder` mechanism while preserving the default legacy frozen-encoder
+  behavior; added `step4b_d2_diagnostic.py`,
+  `tests/test_step4b_d2_diagnostic.py`, and `docs/STEP_4B_D2_REPORT.md`; updated
+  this handoff. Generated ignored evidence under `data/_artifacts/step4b_d2/`.
+  Original `step4b_config.py`, the Step-4B entry point, original Step-4B decision
+  artifacts, and D1 source/results were hash-verified unchanged.
+- Step-4B-D3 diagnostic: added `step4b_d3_diagnostic.py`,
+  `tests/test_step4b_d3_diagnostic.py`, `docs/STEP_4B_D3_PROTOCOL.md`, and
+  `docs/STEP_4B_D3_REPORT.md`; updated this handoff. Generated ignored evidence
+  under `data/_artifacts/step4b_d3/`. Original Step-4B, D1, and D2 records were
+  hash-verified unchanged. No model source file was changed for D3.
+- Step-4B-D4 reproducibility audit: added `step4b_d4_reproducibility.py`,
+  `tests/test_step4b_d4_reproducibility.py`, and `docs/STEP_4B_D4_REPORT.md`;
+  updated this handoff. Generated ignored evidence under
+  `data/_artifacts/step4b_d4/`, including two complete unchanged-D2 repeat roots.
+  D2/D3 runners, model source, and protected historical records were not changed.
 - `docs/EXPERIMENT_LOG.md` was not created because no experiments were run.
 
 ## Repository and Git findings
@@ -441,22 +591,48 @@ written; no dataset file was created, modified, or preprocessed.
 
 - The dedicated Python 3.11 environment was created and all approved focused-test
   dependencies were installed after the separately approved pip upgrade.
-- The complete focused suite ran successfully: 7 passed, 1 skipped, and one
-  external `timm` deprecation warning. Every test is itemized below.
+- The earlier complete focused suite produced 7 passed, 1 skipped, and one
+  external `timm` deprecation warning, as itemized below. With the Step-3 fixture,
+  the same eight-test file now reports **8 passed, 0 skipped**, with one warning.
 - Synthetic forward/backward, optimizer update, checkpoint save/reload, gradient
-  accumulation, and normalization checks passed. No changed-code assertion
-  failed, so no post-install source repair was made.
-- The earlier real-training-sample test skipped when the training list was
-  absent. It was not rerun during this audit, and the feeder-required `csi_ap`
-  files remain absent. No tiny-overfitting or full training run was performed.
-- The real-data audit itself completed successfully: full-list existence and
-  pairing checks passed, and all 24 sampled raw CSI plus 24 sampled keypoint
-  files loaded with finite values. No pytest suite was rerun because this task
-  changed documentation only.
-- No preprocessing, pretraining, pose training, evaluation, or experiment was
-  run. No experimental results or baseline performance numbers exist yet.
+  accumulation, and normalization checks passed. Two additional synthetic bounded
+  preprocessing regression tests passed.
+- The deterministic fixture verified the real training sample load for
+  `S11_01_10` and `S11_01_11`. Official full-dataset processed arrays remain
+  absent; no tiny-overfitting or full training run was performed.
+- The real-data audit completed full-list existence and pairing checks, and all
+  24 sampled raw CSI plus 24 sampled keypoint files loaded with finite values.
+  Its documentation-only task did not rerun pytest.
+- Step 3 ran bounded preprocessing for exactly two training IDs and one separate
+  forward/backward/optimizer smoke step. No pretraining, full pose training,
+  evaluation, checkpoint selection, or experiment was run. No baseline performance
+  or research result is claimed.
 - Training-entry-point imports, TensorBoard, and `mat73` were not verified; the
-  environment must not yet be described as training-ready.
+  environment must not yet be described as generally training-ready.
+- Step-4B-D2 added five focused trainability/optimizer tests; the new file passed
+  `5 passed, 1 warning`, and the existing Step-4B/D1 focused files still passed
+  `7 passed, 1 warning` before the frozen diagnostic. The one-shot D2 CUDA run
+  completed 200 finite steps with all 97 intended gradients finite, all 50 encoder
+  gradients nonzero, all 50 encoder parameters changed, and final train-mode MPJPE
+  `0.46943652629852295` stored units. After implementation, the complete
+  fixture-backed focused suite reported **57 passed, 0 skipped**, with one
+  external `timm` deprecation warning.
+- Step-4B-D3 added five focused protocol/default tests, passed
+  `5 passed, 1 warning`, and then passed the complete fixture-backed suite with
+  **62 passed, 0 skipped** and the same external warning. The pre-run verifier
+  exited `0`. The frozen CUDA run stopped by design at the D2 reproduction gate:
+  initial MPJPE reproduced exactly, step-100 MPJPE was `0.40826788544654846`
+  instead of `0.5151628255844116`, and step-200 MPJPE was `0.3430270552635193`
+  instead of `0.46943652629852295`. It exited `3` with
+  `D2_REPRODUCTION_MISMATCH_STOPPED`; no valid 800-step result exists.
+- Step-4B-D4 added six focused static/environment/protection/comparison tests and
+  passed `6 passed, 1 warning`. Two independent unchanged seed-0 D2 repeats
+  completed 200 finite steps in separate artifact roots. Exact comparisons
+  classified the evidence as **`repeats differ from each other`**; repeat A/B
+  checkpoint MPJPE values were `0.4460887312889099`/`0.46392330527305603` and
+  `0.49196043610572815`/`0.37702471017837524` at steps 100/200. The complete
+  fixture-backed suite passed **68 passed, 0 skipped**, and all 40 protected
+  historical records were hash-verified unchanged after the audit.
 
 ## Newly discovered dataset facts
 
@@ -476,22 +652,21 @@ written; no dataset file was created, modified, or preprocessed.
 - Sampled poses are float64 `(people, 14, 3)` with combined range
   `[-0.171579, 4.10975]`. No sampled raw CSI or pose contains NaN/Inf. Content
   statistics are bounded to the samples, not dataset-wide integrity claims.
-- The Person-in-WiFi-3D loader expects `train_data/csi_ap/*.npy` and
-  `test_data/csi_ap/*.npy`; those and the separate amplitude/phase arrays are
-  absent for every listed ID. `data/person_in_wifi_3d/process.py:99-102` contains
-  an enabled `csi_ap` save, but it was not run and its real-data output remains
-  unverified. Constant normalization frequency and concatenation equality are
-  therefore unknown.
+- Official full-dataset `csi_ap`, amplitude, and phase arrays remain absent. The
+  ignored two-ID fixture contains finite amplitude `(3,90,20)`, phase `(3,90,20)`,
+  and combined `csi_ap` `(3,180,20)` arrays, with exact concatenation and a
+  successful real feeder load. Full-dataset ranges, constant-case frequency, and
+  integrity were not measured.
 - Candidate sequence keys produce 215 train groups and 195 test groups. Train has
   2,032 IDs without an immediate successor on the unfiltered list. All 195 test
   candidate keys overlap train keys, while exact listed-ID overlap is zero.
   Filename-grouped train/development splitting is provisionally possible, but no
   recording-, subject-, or environment-disjoint claim is supported yet.
 - Pose units, joint ordering, coordinate axes/origin/frame, and candidate temporal
-  group semantics remain unproven. A separate audit validated 90 training-pose
-  structures and generated/inspected six skeleton figures; axis 2 appears vertical
-  and metre scale is plausible from body proportions. Overall readiness is YELLOW;
-  see `docs/DATA_AUDIT.md` and `docs/POSE_SPLIT_METRIC_AUDIT.md`.
+  group semantics remain unproven. Local visualization interprets axis 2 as
+  vertical, while the original authors' per-axis evaluation interprets axis 1 as
+  vertical; neither is declared settled and coordinates were not reordered. See
+  `docs/DATA_AUDIT.md` and `docs/POSE_SPLIT_METRIC_AUDIT.md`.
 
 ## Newly discovered environment facts
 
@@ -500,7 +675,8 @@ written; no dataset file was created, modified, or preprocessed.
   PyTorch 2.5.1+cu121, and torchvision 0.20.1+cu121.
 - In the dedicated environment, `pip check` found no broken requirements, CUDA
   12.1 availability was true, and the GPU name was NVIDIA GeForce RTX 3080
-  Laptop GPU. This diagnostic did not run a CUDA computation or training.
+  Laptop GPU. The Step-3 smoke subsequently completed one bounded CUDA training
+  step; this is not a general training-readiness result.
 - The exact tested focused package set is materialized in
   `requirements/focused-test-py311-lock.txt`. The older candidate manifests below
   remain historical proposals and were not materialized or installed.
@@ -513,8 +689,8 @@ written; no dataset file was created, modified, or preprocessed.
 - The focused tests verified the legacy `timm` import paths and whole-model
   `torch.load` checkpoint round-trip on CPU. They emitted one deprecation warning
   for `timm.models.layers`; this did not fail the suite.
-- Full training-entry-point imports, `mat73`, TensorBoard, GPU kernel execution,
-  and real-data compatibility remain unverified.
+- Full training-entry-point imports, `mat73`, TensorBoard, and real-data
+  compatibility beyond the bounded fixture remain unverified.
 
 ## Current errors, blockers, and uncertainties
 
@@ -526,7 +702,7 @@ written; no dataset file was created, modified, or preprocessed.
    pretraining output path, and its consistency test passes.
 3. The processor wrote amplitude and phase but not the feeder's required
    `csi_ap`; it now saves the existing combined `(3, 180, 20)` array as well.
-   Real-data output compatibility remains unverified.
+   Compatibility is verified only for the two-ID fixture.
 4. Pose gradient accumulation did not increment `step_count`, and its unscaled
    backward calls summed microbatch means for `steps_per_update > 1`. The loop
    now increments the counter and divides only accumulated losses by
@@ -553,21 +729,21 @@ written; no dataset file was created, modified, or preprocessed.
 
 ### Runtime verification blockers
 
-- The focused dependency import failures are resolved; all seven runnable tests
-  passed in the dedicated environment's earlier run.
-- Raw train/test content is now present and audited, but no pretrained checkpoint
-  or feeder-required `csi_ap` is available. The real-sample test was not rerun,
-  so Step 3 remains open.
+- The focused dependency import failures are resolved. The fixture-backed focused
+  suite passed all eight tests, and the separate one-step smoke passed.
+- Official full-dataset preprocessing was not run and no pretrained checkpoint is
+  available. The bounded Step-3 gate is complete, but these results do not
+  establish full baseline reproduction or general training readiness.
 - TensorBoard, `mat73`, and training-entry-point imports remain separately
-  unverified. No training-readiness claim is made.
+  unverified. No full training-readiness claim is made.
 
 ### Still unknown
 
-- Processed amplitude/phase/`csi_ap` shapes, ranges, constant-case frequency,
-  concatenation equality, and compatibility with the real feeder.
-- Full-dataset file readability and NaN/Inf status beyond the bounded samples.
+- Full-dataset processed ranges, constant-case frequency, NaN/Inf status, file
+  readability, and feeder compatibility beyond the verified two-ID fixture.
 - Official pose units, joint ordering, and coordinate conventions; visualization
-  has been generated and inspected, but it does not prove those conventions.
+  has been generated and inspected, but it does not prove those conventions. The
+  exact upstream axis/unit source lines remain independently unverified.
 - Recording, subject, environment, and clip semantics of candidate temporal groups.
 - Whether the dedicated environment can run all entry points and whether further
   runtime blockers remain once dependencies are available.
@@ -779,13 +955,18 @@ This confirms only the current interpreter. No tests were available or run.
 
 ## Immediate task
 
-The requested read-only pose, metric, and filename-semantics audit is complete with
-a YELLOW rating. Results, commands, limitations, and six inspected visualizations
-are documented in `docs/POSE_SPLIT_METRIC_AUDIT.md`; the earlier data audit remains
-in `docs/DATA_AUDIT.md`. Stop after the audit as requested. Do not preprocess,
-train, evaluate, or begin Step 4 automatically. Before any later training,
-separately approve and verify the remaining entry-point dependencies and imports,
-including TensorBoard and `mat73`.
+The approved Step-4B-D4 bounded reproducibility audit is complete. Stop here as
+requested: original Step-4B remains **BLOCKED**; D1 and D2 remain above-criterion
+diagnostics only; D3 remains stopped at `D2_REPRODUCTION_MISMATCH_STOPPED` with no
+valid 800-step criterion status. D4 established that two fresh unchanged seed-0
+200-step D2 repeats differ from each other and from historical D2 after exactly
+matching the initial checkpoint. No root cause is claimed. Do not begin Step-4C
+composition controls, rerun D3, extend to 800 steps, selectively enable
+deterministic mode, change the optimizer, relax thresholds, or attempt an
+automatic fix. Any future diagnostic requires a separately approved, newly frozen
+protocol. Scientific readiness and feasibility remain unproven; full-dataset
+preprocessing, pretrained checkpoint availability, TensorBoard, `mat73`, and full
+training-entry-point imports remain outside these bounded results.
 
 ## Focused-test inspection
 
@@ -961,16 +1142,185 @@ preserving the legacy single-device-batch path.
 
 ## Next recommended task
 
-First resolve official pose units/joint ordering/coordinate conventions and the
-meaning of candidate temporal groups; the observed indices require checking the
-actual split-selection convention rather than assuming first-550/last-50. Then,
-only with separate approval, generate the required processed arrays and rerun the
-real training-sample load test without using official `test_data` for training or
-model selection. Before any training, verify TensorBoard, `mat73`, both entry-point
-imports, and all required smoke checks. Keep Step 3 open until those checks pass;
-do not begin Step 4 or full training automatically.
+**Phase B ("Step 5") of `docs/NEXT_PHASE_PLAN.md` section 4**: a single-person baseline that provably
+learns, in one bounded, predeclared step (freeze `docs/STEP_5_PROTOCOL.md` first, then runs R1-R4, then
+`docs/STEP_5_REPORT.md` with verdict GREEN / YELLOW-POSITION / RED). Run it from a fresh session in the
+main checkout with a top-tier reasoning model. Do not begin Phase C ("Step 6") without the user's
+go-ahead after Phase B. The D-series is closed: do not rerun D3 or add another micro-diagnostic, and do
+not relax any frozen threshold.
+
+Before Phase B, the user should decide the open Phase A questions: push `consolidate/step3-to-step4b-r`
+to `kimi`, fast-forward `main`, and drop the retained stash. Also note for Phase B in the main
+checkout: switching branches there will rewrite tracked files, and the protected-record check in
+`step4b_d4_reproducibility.py` hashes three docs with CRLF line endings; the `.gitattributes` added in
+Phase A makes git check those three out as CRLF so the check keeps passing.
 
 ## Progress log
+
+- 2026-11-10: Completed Phase A of `docs/NEXT_PHASE_PLAN.md` only (no new science; Phase B/C not
+  started). Verified stash `9585ba9375a2218a9d3af5ae52c6c640cb247d32` exists and the main checkout had
+  only untracked files; found branch `consolidate/step3-to-step4b-r` already existing at `c494564`
+  with no extra commits and reused it. Applied the stash (exactly the six expected modified files:
+  `.gitignore`, `data/person_in_wifi_3d/process.py`, `docs/CURRENT_TASK.md`,
+  `docs/POSE_SPLIT_METRIC_AUDIT.md`, `docs/PROJECT_CONTEXT.md`, `model/model.py`); the stash entry
+  was left in place. Executed in the git worktree `.claude/worktrees/phase-a-execution-d4e33c` instead of
+  the main checkout: the 43 untracked source/doc/test files were copied from the main checkout (originals
+  untouched) and `data/_artifacts` and `data/_fixtures` were exposed as NTFS junctions to the main
+  checkout's directories (git-ignored), so relative paths resolve; diagnosis outputs therefore land in the
+  main checkout's ignored `data/_artifacts/step4b_r_diagnosis/`. Added `.anchor/`, `archive-7U4NdL/`,
+  `archive-AzzHuZ/`, `archive-GzqAl5/`, `archive-KjVUak/` to the shared `.git/info/exclude` (the plan
+  named three; two more archive directories also exist). `docs/NEXT_PHASE_PLAN.md` was copied from the
+  main checkout and is byte-identical (`cmp`) to
+  `C:\Users\vaska\.claude\plans\c-users-vaska-downloads-zero-shot-3d-mu-fancy-whistle.md`.
+  **Test gate:** the first full-suite run gave `1 failed, 73 passed`
+  (`test_d4_protected_records_include_d3_stop_artifacts_and_match`). Cause: the protected-record check
+  hashes `docs/DATA_AUDIT.md`, `docs/POSE_SPLIT_METRIC_AUDIT.md`, and `docs/PROJECT_CONTEXT.md` as stored in
+  the original Windows working copy with CRLF endings, while git stores LF blobs and this checkout wrote
+  LF; converting each to CRLF reproduces all three expected SHA-256 values exactly. After the user chose
+  to continue, a narrow `.gitattributes` (`text eol=crlf` for those three files only) was added and those
+  three files were rewritten with CRLF; `git status` still shows only the six expected tracked
+  modifications. The full suite then gave `92 passed` (74 + 18 new). Added
+  `diagnose_step4b_r_collapse.py` and `tests/test_step4b_r_collapse_diagnosis.py`; the diagnosis ran on
+  real artifacts with all premises reproduced (see the Step-4B-R collapse diagnosis paragraph above and
+  `docs/STEP_4B_R_COLLAPSE_DIAGNOSIS.md`). Updated this file (status block, Step-4B-R entry, next task).
+  No training, preprocessing, package change, download, deletion, push, remote change, or stash drop
+  occurred; protected `step4b_*` files, `model/model.py` beyond the stashed change, feeders, and dataset
+  contents were not edited.
+
+- 2026-11-08: Completed the approved Step-4B-D4 bounded reproducibility audit of
+  the unchanged D2 trainable-encoder procedure. Added the D4 static/environment/
+  comparison module, six focused tests, `docs/STEP_4B_D4_REPORT.md`, and ignored
+  evidence under `data/_artifacts/step4b_d4/`. Before training, statically
+  compared D2/D3 and recorded the environment without changing either runner or
+  enabling deterministic mode. Executed two independent fresh seed-0 200-step D2
+  repeats in separate roots. Both exactly matched D2's initial MPJPE and retained
+  finite-loss/finite-gradient, exact 97-parameter optimizer coverage, and 97/97
+  trainable plus 50/50 encoder parameter-change evidence. Repeat A measured
+  step-100/200 train-mode MPJPE `0.4460887312889099`/`0.46392330527305603`;
+  repeat B measured `0.49196043610572815`/`0.37702471017837524`; historical D2
+  recorded `0.5151628255844116`/`0.46943652629852295`. Exact comparisons
+  classified the evidence as **`repeats differ from each other`**, with the first
+  A/B full-record divergence at step 1 in `max_abs_encoder_gradient` and first
+  A/B loss divergence at step 3. The D4 focused tests passed `6 passed,
+  1 warning`; the complete fixture-backed suite passed **68 passed, 0 skipped**;
+  all 40 protected historical records remained unchanged. No D3 rerun, 800-step
+  extension, deterministic-setting change, optimizer/criterion/data change,
+  development/test access, epoch training, package change, download, deletion,
+  commit, push, remote change, or automatic fix attempt occurred. Original
+  Step-4B remains **BLOCKED**; D1/D2 remain above-criterion diagnostics; D3
+  remains stopped with no valid 800-step status; no root cause is claimed.
+
+- 2026-11-07: Stopped the approved Step-4B-D3 trainable-encoder extended-step
+  diagnostic at its frozen D2 reproduction gate. Added the separate D3 protocol,
+  D3-only runner, and five focused tests; the focused file reported `5 passed,
+  1 warning`, and the complete fixture-backed suite reported **62 passed,
+  0 skipped**, with the same external `timm` warning. The D3 verifier confirmed
+  the protected original Step-4B, D1, and D2 records, then wrote
+  `data/_artifacts/step4b_d3/step4b_d3_freeze.json` before model construction.
+  The fresh seed-0 trainable-encoder run reproduced the D2 initial train-mode
+  MPJPE exactly, but did not reproduce D2 at step 100 or 200
+  (`0.40826788544654846` versus `0.5151628255844116`, and
+  `0.3430270552635193` versus `0.46943652629852295` stored units). The runner
+  exited `3` with `D2_REPRODUCTION_MISMATCH_STOPPED` and saved the required stop
+  artifact; no valid 800-step D3 result, criterion status, checkpoint trajectory,
+  predictions, or final state-dict exists. Original Step-4B remains **BLOCKED**;
+  D1/D2 remain above-criterion diagnostics. No development/test access, epoch
+  training, package change, preprocessing, download, deletion, commit, push,
+  remote change, rerun, or automatic fix attempt occurred.
+
+- 2026-11-07: Completed the approved Step-4B-D2 encoder-trainability diagnostic.
+  Before editing, a seed-0 CUDA named-parameter audit confirmed the original
+  configuration directly: 50 encoder parameters (`3,390,464` values) frozen, 47
+  pose-decoder parameters (`1,404,931` values) trainable, and SGD coverage exactly
+  matching those 47 parameters. Added an opt-in `train_encoder` mechanism to
+  `model/model.py` while preserving default legacy behavior, plus a separate D2
+  runner and five focused tests covering both modes, initialization preservation,
+  encoder `requires_grad`, optimizer coverage, and parameter-change reporting. The
+  frozen D2 protocol changed only encoder trainability from frozen to trainable and
+  preserved the corrected tiny batch, seed `0`, initialization values, data,
+  preprocessing, loss, SGD optimizer, learning rate `0.01`, momentum `0.9`, batch,
+  200-step budget, coordinate order, and `<=0.10` stored-unit criterion. CUDA
+  training completed with finite losses/gradients; all 97 intended parameters were
+  optimized exactly once, all 50 encoder gradients were nonzero at every step, and
+  all 50 encoder parameters changed. Final train-mode MPJPE was
+  `0.46943652629852295`, above criterion and `0.12929058074951172` worse than the
+  original frozen-encoder endpoint. Saved the pre-edit audit, input verification,
+  D2 freeze, per-step trajectory, checkpoints/predictions, final state_dict, result,
+  and decision under ignored `data/_artifacts/step4b_d2/`; wrote
+  `docs/STEP_4B_D2_REPORT.md`. The complete fixture-backed focused suite reported
+  **57 passed, 0 skipped**, with one external `timm` deprecation warning. Protected
+  original Step-4B/D1 source/result hashes remained unchanged. No development
+  samples, official test data, epoch training, package change, preprocessing,
+  download, deletion, commit, push, or remote change occurred. Original Step-4B
+  remains BLOCKED; scientific feasibility remains unproven.
+
+- 2026-11-07: Completed the approved Step-4B-D1 bounded under-training diagnostic
+  after the failed Step-4B tiny-overfit gate. Added a separate D1 runner and tests
+  that verify the corrected `freeze_v2`/`pilot_data_v2` source records, exact
+  eight-sample CSI/keypoint pairing, unchanged original `BLOCKED` decision, and a
+  D1-only freeze before model construction. The diagnostic used the same data,
+  seed, model, preprocessing, loss, SGD optimizer, learning rate, momentum, batch,
+  device-selection mode, coordinate order, and `<=0.10` stored-unit criterion;
+  only the optimizer budget changed, from 200 to exactly 800 steps. CUDA training
+  completed with finite losses and gradients; the initial and step-200 MPJPE
+  exactly reproduced `4.920130252838135` and `0.34014594554901123`, while final
+  step-800 MPJPE remained `0.32848620414733887`. The trajectory plateaued around
+  `0.33–0.34`, predictions did not collapse toward the fixed-batch or train mean,
+  and error concentrated in coordinate index 2 and joint indices 8, 11, 9, 1, and
+  10. Saved checkpoint JSON/NPZ evidence, a verified final state-dict reload, and
+  ten labelled PNG plots under `data/_artifacts/step4b_d1/`; wrote
+  `docs/STEP_4B_D1_REPORT.md`. The complete focused suite subsequently reported
+  **52 passed, 0 skipped**, with the same external `timm` deprecation warning. No
+  development samples, official test data, epoch training, package change,
+  preprocessing, download, deletion, commit, push, or remote change occurred.
+  Original Step-4B remains BLOCKED; scientific feasibility remains unproven.
+
+- 2026-11-07: Completed the approved Step-4B bounded sanity gate up to its frozen
+  stop rule. Added the frozen Step-4B configuration, deterministic seed-0 subset
+  selector, bounded pilot preprocessing/validation, separate Q=1 single-person
+  loader and research entry point, and focused tests. An initial freeze exposed a
+  filename-count selector error; its shape validation rejected the affected IDs,
+  the rule was corrected to `S?1_*`, and the superseding `freeze_v2` subset was
+  used. Corrected preprocessing validated 2,048 internal-train and 512
+  internal-development samples with zero failures and no source/test-data access.
+  The frozen CUDA overfit check completed 200 finite steps, reducing stored-unit
+  MPJPE from `4.920130252838135` to `0.34014594554901123`, but failed the
+  predeclared `<=0.10` absolute criterion. Recorded `BLOCKED` in
+  `data/_artifacts/step4b_pilot/decision.json` and `docs/STEP_4B_REPORT.md`; no
+  epoch run, development metrics, mean-pose comparison, compositional training,
+  package change, download, deletion, commit, push, or remote change occurred. The
+  complete focused suite reported 48 passed and 0 skipped with one external `timm`
+  deprecation warning. Scientific feasibility remains unproven.
+
+- 2026-11-06: Completed only the approved Step-4A infrastructure task. Added the
+  deterministic candidate-group-disjoint manifest generator, generated ignored
+  internal train/development manifests from all 89,946 official training IDs only,
+  and independently verified zero ID/group overlap and zero immediate-next-frame
+  crossings. Added the flagship unlabelled CSI-only loader with no keypoint,
+  pose/count, raw-ID, or filename-count exposure. Added corrected research metrics
+  in a new module without changing legacy `utils.py`, including Hungarian matching,
+  millimetre conversion exactly once, guarded PCK, count/miss/duplicate/spurious
+  detection, person precision/recall/F1, root error, and unequal-batch-safe
+  aggregation. The complete focused suite with the existing two-frame fixture
+  produced 33 passed and 0 skipped, with one external `timm` deprecation warning.
+  Updated `docs/STEP_4A_REPORT.md` and this handoff. Scientific feasibility,
+  accuracy, novelty, and readiness remain unproven; no preprocessing beyond the
+  existing fixture, training, evaluation, pilot, package change, download,
+  deletion, official test access, commit, push, or remote change occurred.
+
+- 2026-11-06: Completed only the approved bounded Step-3 gate. Corrected shared
+  split/axis/unit/comparator documentation; added reusable explicit-ID bounded
+  preprocessing and its two passing synthetic regression tests; generated the
+  ignored two-frame fixture from official training IDs `S11_01_10` and
+  `S11_01_11`; verified finite `(3,90,20)` amplitude/phase and `(3,180,20)` exact
+  concatenation; and reran the focused suite with 8 passed, 0 skipped, and one
+  external `timm` deprecation warning. A separate from-scratch CUDA smoke ran
+  exactly one forward/backward/SGD step with finite loss `3.750966311`, 47 finite
+  nonzero-gradient tensors, and 47 changed nonzero-gradient parameters. Added the
+  design-only `docs/RESEARCH_PROTOCOL.md`. The bounded engineering/protocol gate
+  is GREEN; scientific feasibility, accuracy, novelty, and readiness remain
+  unproven. No full preprocessing/training, evaluation, official test-array read,
+  package change, download, deletion, commit, push, or pilot occurred.
 
 - 2026-11-05: Completed the read-only pose/split/metric audit. Parsed all 89,946
   train and 7,824 test list IDs without reading test arrays; validated 90 official
