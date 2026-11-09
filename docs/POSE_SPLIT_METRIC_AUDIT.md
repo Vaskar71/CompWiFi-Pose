@@ -11,6 +11,12 @@
 - Wrote only this report and the listed PNG figures, both guarded to be outside the dataset root. No dataset file was created, renamed, moved, deleted, preprocessed, or corrected.
 - Coordinate units and joint order remain interpretations unless explicitly described as verified. Missing frame numbers are not treated as corruption.
 
+## Shared-documentation corrections (2026-11-06)
+
+- The Person-in-WiFi 3D paper documents 600-frame clips with the **first 550 frames for training and last 50 for testing**. The released IDs measured below do not verify a literal first-550/last-50 filename-index mapping: train spans 10..599 and test spans 301..349, with no test IDs in 551..600. The paper protocol and released filename convention must therefore remain distinct; no alternative mapping is asserted. Source: [IEEE Computer Society paper record](https://www.computer.org/csdl/journal/tp/2026/10/11556388/2hbkFLqbBIs).
+- The local bounded-pose audit interprets **axis 2 as vertical**, whereas the original authors' evaluation treats **axis 1 as vertical** in per-axis evaluation. These interpretations conflict. This correction does not reorder coordinates, edit poses, or declare either convention settled.
+- The original authors' evaluation supports converting metre-valued errors to millimetres. The local legacy `calulate_error` path currently omits `*1000` and returns MPJPE/PA-MPJPE in stored/input units. Research metrics must state units explicitly rather than silently inheriting that omission. Upstream source: [Person-in-WiFi 3D repository](https://github.com/aiotgroup/Person-in-WiFi-3D-repo).
+
 ## Part 1 — Filename semantics
 
 ### Exact token rules used

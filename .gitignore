@@ -1,5 +1,8 @@
 __pycache__/
 # data
+data/_artifacts/
+data/_downloads
+data/_fixtures/
 data/person_in_wifi_3d
 data/wipose
 !data/person_in_wifi_3d/process.py

@@ -68,40 +68,48 @@ def dwt_amp(csi):
     csi_amp = pywt.waverec(list, w)
     return csi_amp
 
+def process_id(name, data_dir):
+    csi_path = os.path.join(data_dir, 'csi', (str(name) + '.mat'))
+    with h5py.File(csi_path) as raw_file:
+        csi = raw_file['csi_out']
+        csi = csi['real'] + csi['imag'] * 1j
+    csi = np.array(csi).transpose(3, 2, 1, 0)
+    csi = csi.astype(np.complex128)
+    csi_amp = dwt_amp(csi).transpose(1, 0, 2, 3).reshape((3, 90, 20))
+    csi_ph = phase_deno(csi)
+    csi_ph = np.angle(csi_ph).transpose(1, 0, 2, 3).reshape((3, 90, 20))
+    csi = np.concatenate((csi_amp, csi_ph), axis=1)
+
+    csi_amp_path = os.path.join(data_dir, 'csi_amplitude')
+    os.makedirs(csi_amp_path, exist_ok=True)
+    np.save(os.path.join(csi_amp_path, str(name) + '.npy'), csi_amp)
+
+    csi_ph_path = os.path.join(data_dir, 'csi_phase')
+    os.makedirs(csi_ph_path, exist_ok=True)
+    np.save(os.path.join(csi_ph_path, str(name) + '.npy'), csi_ph)
+
+    csi_ap_path = os.path.join(data_dir, 'csi_ap')
+    os.makedirs(csi_ap_path, exist_ok=True)
+    np.save(os.path.join(csi_ap_path, str(name) + '.npy'), csi)
+
+    print(f'Down: {csi_path}')
+    return csi_amp, csi_ph, csi
+
+
+def process_ids(name_list, data_root, split):
+    results = {}
+    data_dir = os.path.join(data_root, split)
+    for name in name_list:
+        results[name] = process_id(name, data_dir)
+    return results
+
+
 def main():
     train_list_path = 'train_data/train_data_list.txt'
     test_list_path = 'test_data/test_data_list.txt'
     for setting_path in [train_list_path, test_list_path]:
         name_list = load_file_name_list(setting_path)
-        for name in name_list:
-            csi_path = os.path.join(setting_path.split('/')[0],'csi',(str(name)+'.mat'))
-            keypoint_path = os.path.join(setting_path.split('/')[0],'keypoint',(str(name)+'.npy'))
-            # deal
-            csi = h5py.File(csi_path)['csi_out']
-            csi = csi['real'] + csi['imag']*1j
-            csi = np.array(csi).transpose(3,2,1,0)
-            csi = csi.astype(np.complex128)
-            csi_amp = dwt_amp(csi).transpose(1,0,2,3).reshape((3,90,20))  # phase
-            csi_ph = phase_deno(csi)
-            csi_ph = np.angle(csi_ph).transpose(1,0,2,3).reshape((3,90,20))
-            csi = np.concatenate((csi_amp, csi_ph), axis=1)
-            # store
-            csi_amp_path = os.path.join(setting_path.split('/')[0], 'csi_amplitude')
-            if not os.path.exists(csi_amp_path):
-                os.makedirs(csi_amp_path)
-            np.save(f'{csi_amp_path}/{str(name)}.npy', csi_amp)
-
-            csi_ph_path = os.path.join(setting_path.split('/')[0], 'csi_phase')
-            if not os.path.exists(csi_ph_path):
-                os.makedirs(csi_ph_path)
-            np.save(f'{csi_ph_path}/{str(name)}.npy', csi_ph)
-
-            csi_ap_path = os.path.join(setting_path.split('/')[0], 'csi_ap')
-            if not os.path.exists(csi_ap_path):
-                os.makedirs(csi_ap_path)
-            np.save(f'{csi_ap_path}/{str(name)}.npy', csi)
-            
-            print(f'Down: {csi_path}')
+        process_ids(name_list, '.', setting_path.split('/')[0])
     print('All Down.')
 
             

@@ -29,21 +29,33 @@ Do not describe the project as merely:
 - Generic cross-environment learning.
 - Fully supervised multi-person pose improvement.
 
-Literature anchors:
+Literature and comparator anchors:
 - Person-in-WiFi 3D: supervised multi-person set-based pose estimation.
 - DT-Pose: self-supervised representation learning followed by
   supervised pose decoding.
-- WiFi-JEPA: label-free CSI pretraining, followed by supervised
-  downstream pose learning.
-- WiSPER: predictive pretraining and residual refinement using paired
-  CSI-pose supervision.
+- WiFi-JEPA (arXiv:2607.11064): label-free CSI latent-prediction
+  pretraining, followed by supervised downstream pose learning.
+- WiSPER (arXiv:2610.07025): pose-aware predictive pretraining and
+  residual refinement using paired CSI-pose supervision in both stages.
+- WiFi-InstancePose: multi-person counting and 3D human pose estimation
+  from WiFi signals. Its exact training-label and evaluation protocol
+  must be inspected before treating it as a controlled comparator.
+- Self-supervised One-Stage Learning for RF-based Multi-Person Pose
+  Estimation (arXiv:2506.05420): one-stage raw-RF multi-person pose
+  learning with self-supervised masked-latent prediction. Its use of
+  self-supervision does not by itself establish zero real multi-person
+  training labels.
 
 Our precise gap:
-Learning multi-person pose without real multi-person training labels,
-or with extremely small multi-person label budgets.
+Learning multi-person pose with **zero real multi-person training labels**,
+or with extremely small multi-person label budgets. Do not broaden this
+to “annotation-free learning”: labelled single-person supervision and,
+in separately labelled references, multi-person supervision have distinct
+roles.
 
 This is a research hypothesis, not a guarantee that the method will work
-or that no concurrent work exists.
+or that no concurrent work exists. Make no first-ever novelty claim and
+no Q1/venue-quality claim.
 
 ## 4. Public resources
 

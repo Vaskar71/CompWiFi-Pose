@@ -226,7 +226,7 @@ class CustomTransformerEncoderLayer(nn.Module):
 
 
 class ViT_Pose_Decoder(torch.nn.Module):
-    def __init__(self, encoder : MAE_Encoder, keypoints=17, coor_num=3, token_num=285, dataset='mmfi-csi', num_person=1) -> None:
+    def __init__(self, encoder : MAE_Encoder, keypoints=17, coor_num=3, token_num=285, dataset='mmfi-csi', num_person=1, train_encoder=False) -> None:
         super().__init__()
         self.keypoints = keypoints
         self.dataset = dataset
@@ -241,6 +241,7 @@ class ViT_Pose_Decoder(torch.nn.Module):
         self.emb_dim = self.cls_token.size()[2]
         for p in self.parameters():
             p.requires_grad = False
+        self.set_encoder_trainable(train_encoder)
 
         # Task Prompt
         self.pose_prompt = nn.Parameter(torch.zeros(self.emb_dim, self.keypoints*self.num_person))
@@ -259,7 +260,13 @@ class ViT_Pose_Decoder(torch.nn.Module):
             nn.ReLU(),
             nn.Linear(self.emb_dim//4, self.coor_num)
         )
-       
+
+    def set_encoder_trainable(self, train_encoder):
+        encoder_parameters = [self.cls_token, self.pos_embedding]
+        for module in (self.patchify, self.transformer, self.layer_norm):
+            encoder_parameters.extend(module.parameters())
+        for parameter in encoder_parameters:
+            parameter.requires_grad_(train_encoder)
 
     def forward(self, img):
         # b 3 114 10 -> b 297 3 114 10
