@@ -202,3 +202,55 @@ python summarize_step5b.py --repo-root "$R"
 Environment: torch 2.5.1+cu121, RTX 3080 Laptop GPU, deterministic algorithms. Artifacts (git-ignored,
 main checkout): `data/_artifacts/step5b_pose_signal/{premises,freeze_v2,data_v2,protocol_freeze,smoke,overfit,stage1,stage2,logs}`,
 `selection.json`, `verdict.json`, `summary_tables.md`.
+
+---
+
+## Addendum A — POST-HOC dense-recipe confirmation (D3, user-approved after the verdict)
+
+**Not part of the frozen protocol.** The protocol verdict above stays **INCONCLUSIVE**, and
+`selection.json`, `stage2/` and `verdict.json` are unchanged. After seeing the verdict, the user
+approved running option 1 of §9. `posthoc_step5b_dense_check.py` calls the unchanged, hash-verified
+`train_and_evaluate("stage2", "D3", seed)` with the frozen stage-2 recipe: `train_zscore`,
+`all_train_dense` (20,010 frames, 51 recordings), stats/codec `all`, 40 epochs. Outputs go to
+`data/_artifacts/step5b_pose_signal/posthoc_d3/stage2/`.
+
+D3 was chosen because it had the lowest stage-1 X1 ratio among the dense runs. Choosing it uses
+`group_val` (training-partition) labels only. This addendum is a **second use of `group_dev`
+development labels**: one final-epoch evaluation per seed. The source hashes still verify after these
+runs.
+
+| Seed | View | Abs | Centroid | Rel | Oracle abs / rel | Mean skel rel | Motion skill | PA-MPJPE mm* | PCK@0.5 % | Matched |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 0 | all_train_dense | 0.0708 | 0.0416 | 0.0565 | 0.1295 / 0.0932 | 0.1416 | 0.349 | 47.7 | 95.7 | 19996 of 20010 |
+| 0 | all_holdout | 0.1287 | 0.0971 | 0.0806 | 0.1428 / 0.0962 | 0.1444 | 0.061 | 63.6 | 86.9 | 2194 of 2232 |
+| 0 | group_dev | 0.6766 | 0.6497 | 0.1561 | — | 0.1351 | −0.240 | 102.5 | 48.7 | 209 of 512 |
+| 1 | all_train_dense | 0.0706 | 0.0417 | 0.0561 | 0.1295 / 0.0932 | 0.1416 | 0.354 | 47.4 | 95.7 | 19990 of 20010 |
+| 1 | all_holdout | 0.1316 | 0.1000 | 0.0808 | 0.1428 / 0.0962 | 0.1444 | 0.051 | 64.1 | 86.9 | 2191 of 2232 |
+| 1 | group_dev | 0.6430 | 0.6139 | 0.1606 | — | 0.1351 | −0.253 | 110.1 | 47.1 | 235 of 512 |
+| 2 | all_train_dense | 0.0710 | 0.0415 | 0.0570 | 0.1295 / 0.0932 | 0.1416 | 0.343 | 48.2 | 95.6 | 20000 of 20010 |
+| 2 | all_holdout | 0.1293 | 0.0976 | 0.0814 | 0.1428 / 0.0962 | 0.1444 | 0.053 | 65.0 | 87.1 | 2193 of 2232 |
+| 2 | group_dev | 0.6394 | 0.6107 | 0.1562 | — | 0.1351 | −0.222 | 113.4 | 47.7 | 227 of 512 |
+
+| Seed | T1 ratio (all_holdout) | T1 | abs/oracle (reported) | X1 ratio (group_dev) | X1 | abs/mean pose (reported) | Reload exact | Runtime s |
+|---|---|---|---|---|---|---|---|---|
+| 0 | 0.837 | pass | 0.902 | 1.155 | FAIL | 0.711 | True | 437 |
+| 1 | 0.839 | pass | 0.922 | 1.189 | FAIL | 0.676 | True | 442 |
+| 2 | 0.846 | pass | 0.906 | 1.156 | FAIL | 0.672 | True | 432 |
+
+**Reading (post-hoc).** Applying the verdict definitions to D3, T1 passes in all three seeds and X1
+fails in all three. That is the **YELLOW-TRACKS pattern**: pose sensing exists but is
+recording-specific. The pattern rests on a disclosed post-hoc choice, not on the frozen selection.
+Points to note:
+- **Seen recordings:** within-recording tracking is stable over seeds. The rel/oracle ratio is
+  0.84 ± 0.005, and the dense model also beats the oracle in absolute terms (abs/oracle 0.90–0.92).
+- **Unseen recordings:** the dense model is *worse* than sparse D1 on `group_dev`. Its X1 ratios are
+  1.16–1.19, against 1.09–1.11 for D1. Motion skill there is −0.22 to −0.25, against about −0.14 for D1.
+  More frames per recording fit recording-specific pose more tightly and transfer less. The absolute
+  ratio to the mean pose is about the same (0.67–0.71).
+- **Frame-to-frame motion:** on held-out frames of seen recordings, motion skill is small (+0.05 to
+  +0.06), so the model follows fast motion only weakly. As in §7, much of the T1 gain probably comes from
+  slower within-recording pose changes (interpretation, not tested).
+
+**Recommendation (unchanged; for the user to decide).** The YELLOW-TRACKS recommendation applies in
+substance. Either redesign Phase C around label-free adaptation to the target recordings (their
+unlabelled CSI is permitted), or switch to the label-efficiency track. Phase C has not been started.

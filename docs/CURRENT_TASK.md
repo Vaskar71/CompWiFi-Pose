@@ -15,6 +15,10 @@
     every run.
   - **Why INCONCLUSIVE:** the predeclared tie rule selected D1, because all X1 ratios were ≈ 1. Stage 2
     therefore confirmed the one run that fails T1.
+- **Post-hoc addendum** (user-approved after the verdict; `docs/STEP_5B_REPORT.md` Addendum A): the frozen
+  stage-2 recipe for dense D3 (`all_train_dense`, 3 seeds) passes T1 in 3/3 (0.837/0.839/0.846) and fails
+  X1 in 3/3 (1.155/1.189/1.156; worse than sparse D1). That is the YELLOW-TRACKS pattern, post-hoc. It is
+  the second use of group_dev labels. The protocol verdict stays INCONCLUSIVE.
 - **Previous verdict:** Step 5 = YELLOW-POSITION (`docs/STEP_5_REPORT.md`).
 - **Data:** `data/_artifacts/step5b_pose_signal/freeze_v2` (dense views; 42 fit + 9 validation recordings;
   1,632 guard frames) and `data_v2` (22,754 validated samples, 4.5 GB). Step-5 `freeze_v1`/`data_v1`
@@ -24,10 +28,9 @@
   `.claude/worktrees/charming-napier-69e92f`). **Not pushed, not merged.**
 - **Tests:** fixture-backed suite -> 146 passed, 1 skipped, 1 failed (118 baseline + 28 new). The failure
   is the known worktree-only `test_d4_protected_records_include_d3_stop_artifacts_and_match`.
-- **Next task (needs a user decision):** (1) a disclosed post-hoc stage-2 confirmation of the dense
-  recipe (D2 or D3, 3 seeds, ~20 min) to test whether T1 holds over seeds; and/or (2) treat X1 as decisive
-  and redesign Phase C around label-free adaptation to target recordings, or switch to the
-  label-efficiency track. Do not start either without the user's go-ahead.
+- **Next task (needs a user decision):** the post-hoc D3 check is done. Choose between redesigning Phase C
+  around label-free adaptation to the target recordings (their unlabelled CSI is permitted) and switching to
+  the label-efficiency track. Do not start either without the user's go-ahead.
 - Detailed history below is unchanged; the Step-5b entry is at the top of the progress log.
 
 ## Dataset acquisition and audit status (2026-11-05)
@@ -1173,6 +1176,8 @@ training. Also open: push/merge `research/step5-single-person-baseline`.
   8. Stage 2 D1 seeds 0-2: T1 FAIL (1.103/1.115/1.103), X1 FAIL (1.108/1.097/1.093).
   9. Verdict: INCONCLUSIVE.
   Every reload was exact and the source hashes still verify. Nothing pushed or merged; Phase C not started.
+  Post-hoc addendum (user-approved): `posthoc_step5b_dense_check.py` ran D3 stage-2 seeds 0-2 into
+  `posthoc_d3/`. T1 passes 0.837/0.839/0.846 and X1 fails 1.155/1.189/1.156 (YELLOW-TRACKS pattern, post-hoc).
 
 - 2026-11-10: Completed Phase B ("Step 5") of `docs/NEXT_PHASE_PLAN.md` only; verdict
   **YELLOW-POSITION**. Executed in worktree `.claude/worktrees/phase-b-execution-ce4d08` on new branch
