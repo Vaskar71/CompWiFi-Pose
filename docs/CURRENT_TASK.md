@@ -1,33 +1,34 @@
 # Current Task and Project Status
 
-## Status at a glance (updated 2026-11-10, end of Phase A)
+## Status at a glance (updated 2026-11-10, end of Phase B)
 
-- **Phase:** Phase A of `docs/NEXT_PHASE_PLAN.md` (consolidate and secure the repository) is complete.
-  Plan: Phase A (done) -> Phase B "Step 5" (single-person baseline that provably learns) -> Phase C
-  "Step 6" (minimal compositional pilot, arms A/B/C). Binding rules: `AGENTS.md`,
-  `docs/PROJECT_CONTEXT.md`, `docs/RESEARCH_PROTOCOL.md`, and the plan itself.
-- **Last scientific verdict:** Step-4B-R = `BASELINE_COMPLETE` (completion status, not an accuracy pass).
-  From-scratch DT-Pose encoder + legacy pose decoder, 10 epochs, AdamW lr 1e-3, batch 8. It did **not**
-  beat the constant train-mean pose: train/dev MPJPE 1.0592/0.8333 vs mean-pose 0.9898/0.8014 (stored
-  units; development = 4 candidate-filename groups disjoint from the 8 training groups). Original
-  Step-4B stays `BLOCKED`; D1-D4 are closed.
-- **Collapse diagnosis (Phase A, reproduced, `docs/STEP_4B_R_COLLAPSE_DIAGNOSIS.md`):** all 512 dev
-  predictions are one identical 3D point (std across samples 6.6e-07); the legacy pose decoder's three
-  post-norm transformer layers are dead (activation std across samples 4.2e-04 -> 5.4e-06 -> 4.7e-07)
-  while the encoder feature (0.196) and `gconv3` (0.476) are alive; the target is dominated by position
-  (centroid-relative mean-skeleton MPJPE only 0.155 train / 0.128 dev vs 0.990 / 0.801 absolute); the pilot
-  has only 8 training positions. All numbers in the plan's premises reproduced.
-- **Repository:** branch `consolidate/step3-to-step4b-r` holds all work since `c494564` (Step 3 gate ->
-  Step-4B-R + diagnosis), committed locally in logical commits. **Nothing is pushed**; `main` is
-  unchanged; stash `9585ba9375a2218a9d3af5ae52c6c640cb247d32` is retained (not dropped).
-- **Tests:** `PIW3D_DATA_ROOT=data/_fixtures/piw3d_two_frame ... pytest tests` -> **92 passed, 0 skipped**
-  (74 baseline + 18 new collapse-diagnosis tests). Before the line-ending fix recorded below the same
-  suite gave 73 passed, 1 failed.
-- **Open user decisions (plan step 9):** (a) push the branch to `kimi`? (b) fast-forward `main`?
-  (c) drop the stash now that its content is committed? None done.
-- **Next task:** Phase B ("Step 5", `docs/NEXT_PHASE_PLAN.md` section 4) in a fresh session, working in the
-  main checkout (data/artifacts exist only there). Do not start Phase B or C without the user's go-ahead.
-- Detailed history below is unchanged; the Phase A entry is at the top of the progress log.
+- **Phase:** Phase B ("Step 5") of `docs/NEXT_PHASE_PLAN.md` is complete; Phase C ("Step 6") is **not**
+  started and needs the user's go-ahead. Binding rules: `AGENTS.md`, `docs/PROJECT_CONTEXT.md`,
+  `docs/RESEARCH_PROTOCOL.md`, the plan, and the frozen `docs/STEP_5_PROTOCOL.md`.
+- **Last scientific verdict:** Step 5 = **YELLOW-POSITION** (`docs/STEP_5_REPORT.md`). The single-person
+  baseline now provably learns: all four runs (R1-R4) leave the constant regime and pass G1-G5 (train
+  0.12-0.22 x mean pose; same-group temporal holdout 0.23-0.38 x mean pose, centroid-relative 0.70-0.88 x
+  mean skeleton). On the 8 unseen (candidate-filename-group disjoint) dev groups, absolute MPJPE beats
+  the mean pose (0.66-0.85 x), but the centroid-relative pose is worse than the train-mean skeleton in
+  every run and seed (1.09-1.25 x), so G6 fails. Selected run R2 (`simple_cnn`, legacy min-max input),
+  seeds 0/1/2: group_dev 0.6426 +/- 0.0180 vs mean pose 0.9463 (stored units).
+- **Legacy decoder:** with warmup + cosine, clip 1.0, batch 32, 40 epochs on 51 groups, the unmodified
+  `ViT_Pose_Decoder` (R4) no longer collapses (train prediction std 0.47 vs 6.6e-07 in Step-4B-R) but is
+  the weakest of R1-R4. Recipe and data changed together, so their effects are not separated.
+- **Data:** Step-5 freeze `data/_artifacts/step5_single_person/freeze_v1` (train 3,264 / temporal_holdout
+  804 / group_dev 512 IDs; 51 + 8 single-person groups); preprocessed `data_v1` (4,580 validated, 908 MB).
+- **Repository:** Phase B code, tests, protocol and report are on local branch
+  `research/step5-single-person-baseline` (worktree `.claude/worktrees/phase-b-execution-ce4d08`), from
+  `main` = `kimi/main` = `a47b47a`. **Not pushed, not merged.** No stash entries remain.
+- **Tests:** fixture-backed suite in the worktree -> **119 passed, 1 failed** of 120 (92 prior +
+  28 new Step-5 tests). The failure is `test_d4_protected_records_include_d3_stop_artifacts_and_match`,
+  which hashes `data/_artifacts/...` by relative path; those git-ignored artifacts exist only in the main
+  checkout, so it cannot pass from a worktree (environment, not code).
+- **Next task (needs a user decision):** YELLOW-POSITION options from the plan: (a) Phase C under an
+  explicitly disclosed official-like temporal protocol with group-disjoint results alongside, or
+  (b) a data-scaling run on all 23,874 single-person train IDs (ask first; ~5-6 GB). Do not start either
+  without the user's go-ahead.
+- Detailed history below is unchanged; the Phase B entry is at the top of the progress log.
 
 ## Dataset acquisition and audit status (2026-11-05)
 
@@ -1142,20 +1143,37 @@ preserving the legacy single-device-batch path.
 
 ## Next recommended task
 
-**Phase B ("Step 5") of `docs/NEXT_PHASE_PLAN.md` section 4**: a single-person baseline that provably
-learns, in one bounded, predeclared step (freeze `docs/STEP_5_PROTOCOL.md` first, then runs R1-R4, then
-`docs/STEP_5_REPORT.md` with verdict GREEN / YELLOW-POSITION / RED). Run it from a fresh session in the
-main checkout with a top-tier reasoning model. Do not begin Phase C ("Step 6") without the user's
-go-ahead after Phase B. The D-series is closed: do not rerun D3 or add another micro-diagnostic, and do
-not relax any frozen threshold.
-
-Before Phase B, the user should decide the open Phase A questions: push `consolidate/step3-to-step4b-r`
-to `kimi`, fast-forward `main`, and drop the retained stash. Also note for Phase B in the main
-checkout: switching branches there will rewrite tracked files, and the protected-record check in
-`step4b_d4_reproducibility.py` hashes three docs with CRLF line endings; the `.gitattributes` added in
-Phase A makes git check those three out as CRLF so the check keeps passing.
+Phase B ("Step 5") ended **YELLOW-POSITION** (`docs/STEP_5_REPORT.md`). Per the frozen protocol the step
+stops here, and the next move is the user's choice between the plan's two options:
+(a) Phase C ("Step 6", `docs/NEXT_PHASE_PLAN.md` section 5) under an explicitly disclosed **official-like
+temporal protocol** (same groups, held-out frame blocks), with group-disjoint results always reported
+alongside; the Step-5 encoder candidate would be R2's `simple_cnn` (or R1, with the z-score input).
+(b) A data-scaling run on all 23,874 single-person internal-train IDs (~5-6 GB preprocessing plus full
+training; ask first). Caveat: it adds frames, not groups, and the 51 training groups are the likely limit
+on G6. The Phase C protocol (`docs/STEP_6_PROTOCOL.md`) must itself be approved before any Phase C
+training. Also open: push/merge `research/step5-single-person-baseline`.
 
 ## Progress log
+
+- 2026-11-10: Completed Phase B ("Step 5") of `docs/NEXT_PHASE_PLAN.md` only; verdict
+  **YELLOW-POSITION**. Executed in worktree `.claude/worktrees/phase-b-execution-ce4d08` on new branch
+  `research/step5-single-person-baseline` (from `a47b47a`). There are no junctions this time: every new
+  script takes `--repo-root "J:/Zero-shot 3D Multi-person Pose Estimation"`, so data and artifacts are
+  read and written in the main checkout's git-ignored `data/`. New files: `step5_config.py`,
+  `step5_subset.py`, `make_step5_data.py`, `feeder/piw3d_step5.py`, `model/research_models.py`,
+  `step5_single_person_baseline.py`, `summarize_step5.py`, `tests/test_step5_{subset,models,feeder,runner}.py`,
+  `docs/STEP_5_PROTOCOL.md`, `docs/STEP_5_REPORT.md`. No protected file was edited. Order:
+  1. Subset freeze: 51/8 groups; 3,264 / 804 / 512 IDs; 510 guard IDs.
+  2. Preprocessing: 4,580/0 failures, 445 s.
+  3. Code + protocol committed (`3a71989`), then the protocol was frozen at 2026-11-10T08:50:03Z.
+     Working-tree files were normalised to LF first so the frozen hashes equal the git blobs.
+  4. Smoke G1 pass (R1-R4, CUDA).
+  5. Overfit G2 pass: R1 ratio 0.076, R3 ratio 0.066.
+  6. Seed 0 for R1-R4: all pass G3-G5 and fail G6 on the centroid-relative criterion.
+  7. Selection: R2 (group_dev 0.6478; R1 0.6589 is 1.7% higher, outside the 1% tie).
+  8. R2 seeds 1-2, then the verdict.
+  Every run's reloaded state dict reproduced its final predictions bit-exactly. Total training time
+  about 50 min. Official test data was never opened, and no multi-person sample was used.
 
 - 2026-11-10: Completed Phase A of `docs/NEXT_PHASE_PLAN.md` only (no new science; Phase B/C not
   started). Verified stash `9585ba9375a2218a9d3af5ae52c6c640cb247d32` exists and the main checkout had
