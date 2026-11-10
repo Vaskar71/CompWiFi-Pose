@@ -28,9 +28,11 @@
   `.claude/worktrees/charming-napier-69e92f`). **Not pushed, not merged.**
 - **Tests:** fixture-backed suite -> 146 passed, 1 skipped, 1 failed (118 baseline + 28 new). The failure
   is the known worktree-only `test_d4_protected_records_include_d3_stop_artifacts_and_match`.
-- **Next task (needs a user decision):** the post-hoc D3 check is done. Choose between redesigning Phase C
-  around label-free adaptation to the target recordings (their unlabelled CSI is permitted) and switching to
-  the label-efficiency track. Do not start either without the user's go-ahead.
+- **Next task:** the user chose the **adaptation redesign** of Phase C. The plan is drafted in
+  `docs/STEP_6_ADAPTATION_PLAN.md`. Step 6a is a single-person adaptation gate (arms A0/A1 masked
+  reconstruction/A2 CORAL, plus an R-few reference) on unseen recordings, and must pass before the
+  compositional Step 6b. **Awaiting user approval** of the plan, the ≈0.8 GB `data_v3` preprocessing and
+  the ≈2-3 GPU-h 6a matrix. Nothing has been started. Do not start either without the user's go-ahead.
 - Detailed history below is unchanged; the Step-5b entry is at the top of the progress log.
 
 ## Dataset acquisition and audit status (2026-11-05)
