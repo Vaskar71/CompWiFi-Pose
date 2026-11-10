@@ -1,34 +1,34 @@
 # Current Task and Project Status
 
-## Status at a glance (updated 2026-11-10, end of Phase B)
+## Status at a glance (updated 2026-11-10, end of Step 5b)
 
-- **Phase:** Phase B ("Step 5") of `docs/NEXT_PHASE_PLAN.md` is complete; Phase C ("Step 6") is **not**
-  started and needs the user's go-ahead. Binding rules: `AGENTS.md`, `docs/PROJECT_CONTEXT.md`,
-  `docs/RESEARCH_PROTOCOL.md`, the plan, and the frozen `docs/STEP_5_PROTOCOL.md`.
-- **Last scientific verdict:** Step 5 = **YELLOW-POSITION** (`docs/STEP_5_REPORT.md`). The single-person
-  baseline now provably learns: all four runs (R1-R4) leave the constant regime and pass G1-G5 (train
-  0.12-0.22 x mean pose; same-group temporal holdout 0.23-0.38 x mean pose, centroid-relative 0.70-0.88 x
-  mean skeleton). On the 8 unseen (candidate-filename-group disjoint) dev groups, absolute MPJPE beats
-  the mean pose (0.66-0.85 x), but the centroid-relative pose is worse than the train-mean skeleton in
-  every run and seed (1.09-1.25 x), so G6 fails. Selected run R2 (`simple_cnn`, legacy min-max input),
-  seeds 0/1/2: group_dev 0.6426 +/- 0.0180 vs mean pose 0.9463 (stored units).
-- **Legacy decoder:** with warmup + cosine, clip 1.0, batch 32, 40 epochs on 51 groups, the unmodified
-  `ViT_Pose_Decoder` (R4) no longer collapses (train prediction std 0.47 vs 6.6e-07 in Step-4B-R) but is
-  the weakest of R1-R4. Recipe and data changed together, so their effects are not separated.
-- **Data:** Step-5 freeze `data/_artifacts/step5_single_person/freeze_v1` (train 3,264 / temporal_holdout
-  804 / group_dev 512 IDs; 51 + 8 single-person groups); preprocessed `data_v1` (4,580 validated, 908 MB).
-- **Repository:** Phase B code, tests, protocol and report are on local branch
-  `research/step5-single-person-baseline` (worktree `.claude/worktrees/phase-b-execution-ce4d08`), from
-  `main` = `kimi/main` = `a47b47a`. **Not pushed, not merged.** No stash entries remain.
-- **Tests:** fixture-backed suite in the worktree -> **119 passed, 1 failed** of 120 (92 prior +
-  28 new Step-5 tests). The failure is `test_d4_protected_records_include_d3_stop_artifacts_and_match`,
-  which hashes `data/_artifacts/...` by relative path; those git-ignored artifacts exist only in the main
-  checkout, so it cannot pass from a worktree (environment, not code).
-- **Next task (needs a user decision):** YELLOW-POSITION options from the plan: (a) Phase C under an
-  explicitly disclosed official-like temporal protocol with group-disjoint results alongside, or
-  (b) a data-scaling run on all 23,874 single-person train IDs (ask first; ~5-6 GB). Do not start either
-  without the user's go-ahead.
-- Detailed history below is unchanged; the Phase B entry is at the top of the progress log.
+- **Phase:** Step 5b (`docs/STEP_5B_PLAN.md`, inserted between Phase B and Phase C) is complete with
+  verdict **INCONCLUSIVE** (`docs/STEP_5B_REPORT.md`). Phase C ("Step 6") is **not** started and needs
+  the user's decision. Binding rules: `AGENTS.md`, `docs/PROJECT_CONTEXT.md`, `docs/RESEARCH_PROTOCOL.md`,
+  `docs/NEXT_PHASE_PLAN.md`, `docs/STEP_5B_PLAN.md`, and the frozen `docs/STEP_5B_PROTOCOL.md`.
+- **Step-5b findings** (stored units; "recording" = candidate filename group):
+  - **Premises:** 17/18 reproduce; lag-8 pose autocorrelation is 0.14 vs the plan's 0.17 (disclosed).
+  - **Dense frames give within-recording tracking:** stage 1 seed 0, D2/D3/D4 beat the recording-mean
+    oracle on `fit_holdout` (T1 ratios 0.853/0.858/0.905). Sparse D1 does not (1.109).
+  - **No transfer to unseen recordings:** body pose never beats the train-mean skeleton (X1 0.993-1.074
+    in stage 1; D1 stage 2 on group_dev 1.093-1.108 over 3 seeds). Motion skill there is negative in
+    every run.
+  - **Why INCONCLUSIVE:** the predeclared tie rule selected D1, because all X1 ratios were ≈ 1. Stage 2
+    therefore confirmed the one run that fails T1.
+- **Previous verdict:** Step 5 = YELLOW-POSITION (`docs/STEP_5_REPORT.md`).
+- **Data:** `data/_artifacts/step5b_pose_signal/freeze_v2` (dense views; 42 fit + 9 validation recordings;
+  1,632 guard frames) and `data_v2` (22,754 validated samples, 4.5 GB). Step-5 `freeze_v1`/`data_v1`
+  unchanged.
+- **Repository:** Step-5b code, tests, plan, protocol and report are on local branch
+  `research/step5b-pose-signal` (from `research/step5-single-person-baseline` `11fad75`; worktree
+  `.claude/worktrees/charming-napier-69e92f`). **Not pushed, not merged.**
+- **Tests:** fixture-backed suite -> 146 passed, 1 skipped, 1 failed (118 baseline + 28 new). The failure
+  is the known worktree-only `test_d4_protected_records_include_d3_stop_artifacts_and_match`.
+- **Next task (needs a user decision):** (1) a disclosed post-hoc stage-2 confirmation of the dense
+  recipe (D2 or D3, 3 seeds, ~20 min) to test whether T1 holds over seeds; and/or (2) treat X1 as decisive
+  and redesign Phase C around label-free adaptation to target recordings, or switch to the
+  label-efficiency track. Do not start either without the user's go-ahead.
+- Detailed history below is unchanged; the Step-5b entry is at the top of the progress log.
 
 ## Dataset acquisition and audit status (2026-11-05)
 
@@ -1154,6 +1154,25 @@ on G6. The Phase C protocol (`docs/STEP_6_PROTOCOL.md`) must itself be approved 
 training. Also open: push/merge `research/step5-single-person-baseline`.
 
 ## Progress log
+
+- 2026-11-10: Completed **Step 5b** (`docs/STEP_5B_PLAN.md`); verdict **INCONCLUSIVE**. Branch
+  `research/step5b-pose-signal` from `11fad75`, worktree `.claude/worktrees/charming-napier-69e92f`,
+  `--repo-root` pointing at the main checkout. The user approved the dense preprocessing and the training
+  runs in the kickoff message. New files: `analyze_step5_recording_effects.py`, `step5b_config.py`,
+  `step5b_subset.py`, `make_step5b_data.py`, `feeder/piw3d_step5b.py`, `step5b_pose_signal.py`,
+  `summarize_step5b.py`, `tests/test_step5b_{recording_effects,subset,runner}.py`,
+  `docs/STEP_5B_{PLAN,PROTOCOL,REPORT}.md`. No protected file was edited. Order:
+  1. Premises: 17/18 reproduce; lag-8 autocorrelation is 0.142 vs 0.17 (disclosed; it strengthens the
+     premise).
+  2. `freeze_v2`: all view counts and the 9 validation recordings exactly as planned.
+  3. Code + protocol committed (`6a2a97b`), then the protocol was frozen at 2026-11-10T11:46:07Z.
+  4. `data_v2` preprocessing: 22,754/0 failures, 1,742 s.
+  5. Gate S pass (smoke D1-D4; overfit D2 0.106, D4 0.051).
+  6. Stage 1: T1 D1 FAIL 1.109, D2 0.853, D3 0.858, D4 0.905; X1 fails for all (0.995/0.998/0.993/1.074).
+  7. Selection: D1 (tie band; simplest).
+  8. Stage 2 D1 seeds 0-2: T1 FAIL (1.103/1.115/1.103), X1 FAIL (1.108/1.097/1.093).
+  9. Verdict: INCONCLUSIVE.
+  Every reload was exact and the source hashes still verify. Nothing pushed or merged; Phase C not started.
 
 - 2026-11-10: Completed Phase B ("Step 5") of `docs/NEXT_PHASE_PLAN.md` only; verdict
   **YELLOW-POSITION**. Executed in worktree `.claude/worktrees/phase-b-execution-ce4d08` on new branch
